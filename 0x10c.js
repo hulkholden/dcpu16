@@ -1,14 +1,4 @@
 
-var gProgram = [
-        0x7c01, 0x0030, 0x7de1, 0x1000, 0x0020, 0x7803, 0x1000, 0xc00d,
-        0x7dc1, 0x001a, 0xa861, 0x7c01, 0x2000, 0x2161, 0x2000, 0x8463,
-        0x806d, 0x7dc1, 0x000d, 0x9031, 0x7c10, 0x0018, 0x7dc1, 0x001a,
-        0x9037, 0x61c1, 0x7dc1, 0x001a, 
- ];
-
-// Bail when PC hits this
-var gHaltOnPC = 26;
-
 function operandHasData(operand) {
 	return (operand >= 0x10 && operand < 0x18) || operand == 0x1e || operand == 0x1f;
 }
@@ -193,9 +183,6 @@ function makePuter() {
 		run : function(cycle_count) {
 
 			for( var count = 0; count < cycle_count; ++count ) {
-				if (this.PC == gHaltOnPC)
-					break;
-
 				var orig_sp = this.SP;
 
 				var opcode = this.data[this.PC++];
@@ -206,6 +193,7 @@ function makePuter() {
 				//printIt((this.CondExec ? "&nbsp;" : "-") +  "PC " + (this.PC-1) + ": " + opcode.toString(16));
 
 				if (this.CondExec) {
+	
 					if (op == 0)
 					{
 						switch(a) {
@@ -291,16 +279,23 @@ function displayDisassembly(code, cur_pc) {
 	var dis = makeDisassembler(code);
 	var $pre = $('<table />');
 
-	$pre.append('<tr><th width=100>Address</th><th></th></tr>');
+	$pre.append('<tr><th width=100></th><th></th><th></th></tr>');
 
 	while (dis.PC < dis.code.length) {
 		var pc = dis.PC;
-		var d = dis.disasm() + '\n';
-		if (pc === cur_pc) {
-			$pre.append('<tr bgcolor=eeeee><td>*' + '0x' + pc.toString(16) + '</td><td>' + d + '</td></tr>');
-		} else {
-			$pre.append('<tr><td>' + '0x' + pc.toString(16) + '</td><td>' + d + '</td></tr>');
+		var d = dis.disasm();
+
+		var ops = '';
+		for (var i = pc; i < dis.PC; ++i) {
+			var op = dis.code[i].toString(16);
+			while(op.length < 4) op = '0' + op;
+			ops +=  op + ' ';
 		}
+
+		var $tr = $('<tr><td>0x' + pc.toString(16) + '</td><td>' + ops + '</td><td>' + d + '</td></tr>');
+		if (pc === cur_pc)
+			$tr.attr('bgcolor', '#eeeeee');
+		$pre.append($tr);
 	}
 
 
