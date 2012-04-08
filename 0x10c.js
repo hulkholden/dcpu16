@@ -203,7 +203,7 @@ function makePuter() {
 				var a  = (opcode&0x03f0)>>4;
 				var b  = (opcode&0xfc00)>>10;
 
-				printIt((this.CondExec ? "&nbsp;" : "-") +  "PC " + (this.PC-1) + ": " + opcode.toString(16));
+				//printIt((this.CondExec ? "&nbsp;" : "-") +  "PC " + (this.PC-1) + ": " + opcode.toString(16));
 
 				if (this.CondExec) {
 					if (op == 0)
