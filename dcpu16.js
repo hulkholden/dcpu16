@@ -1,14 +1,4 @@
 
-var gProgram = [
-        0x7c01, 0x0030, 0x7de1, 0x1000, 0x0020, 0x7803, 0x1000, 0xc00d,
-        0x7dc1, 0x001a, 0xa861, 0x7c01, 0x2000, 0x2161, 0x2000, 0x8463,
-        0x806d, 0x7dc1, 0x000d, 0x9031, 0x7c10, 0x0018, 0x7dc1, 0x001a,
-        0x9037, 0x61c1, 0x7dc1, 0x001a, 
- ];
-
-// Bail when PC hits this
-var gHaltOnPC = 26;
-
 function operandHasData(operand) {
 	return (operand >= 0x10 && operand < 0x18) || operand == 0x1e || operand == 0x1f;
 }
@@ -97,9 +87,9 @@ function makeDisassembler(_code) {
 	return disassembler;
 } 
 
-function makePuter(code) {
+function makePuter() {
 
-	var stream = {
+	var puter = {
 		data : new Uint16Array(0x10000),
 		regs : new Uint16Array(8),		// A B C X Y Z I J
 		PC : 0,
@@ -193,9 +183,6 @@ function makePuter(code) {
 		run : function(cycle_count) {
 
 			for( var count = 0; count < cycle_count; ++count ) {
-				if (this.PC == gHaltOnPC)
-					break;
-
 				var orig_sp = this.SP;
 
 				var opcode = this.data[this.PC++];
@@ -203,9 +190,10 @@ function makePuter(code) {
 				var a  = (opcode&0x03f0)>>4;
 				var b  = (opcode&0xfc00)>>10;
 
-				printIt((this.CondExec ? "&nbsp;" : "-") +  "PC " + (this.PC-1) + ": " + opcode.toString(16));
+				//printIt((this.CondExec ? "&nbsp;" : "-") +  "PC " + (this.PC-1) + ": " + opcode.toString(16));
 
 				if (this.CondExec) {
+	
 					if (op == 0)
 					{
 						switch(a) {
@@ -284,20 +272,34 @@ function makePuter(code) {
 		},
 	};
 
-	stream.loadCode(code);
-
-	return stream;
+	return puter;
 }
 
-function displayDisassembly(code) {
+function displayDisassembly(code, cur_pc) {
 	var dis = makeDisassembler(code);
-	var $pre = $('<pre/>');
+	var $pre = $('<table />');
+
+	$pre.append('<tr><th width=100></th><th></th><th></th></tr>');
 
 	while (dis.PC < dis.code.length) {
-		var d = dis.disasm() + '\n';
-		$pre.append(d);
+		var pc = dis.PC;
+		var d = dis.disasm();
+
+		var ops = '';
+		for (var i = pc; i < dis.PC; ++i) {
+			var op = dis.code[i].toString(16);
+			while(op.length < 4) op = '0' + op;
+			ops +=  op + ' ';
+		}
+
+		var $tr = $('<tr><td>0x' + pc.toString(16) + '</td><td>' + ops + '</td><td>' + d + '</td></tr>');
+		if (pc === cur_pc)
+			$tr.attr('bgcolor', '#eeeeee');
+		$pre.append($tr);
 	}
-	$('#disasm').append($pre);
+
+
+	$('#disasm').html($pre);
 
 }
 
@@ -328,16 +330,10 @@ function displayState(puter) {
 	$('#registers').html($table);
 }
 
-function execute(name, data) {
+function execute(puter, data) {
 
-	var c = '<div class="row"><div class="span12"><div id="disasm"></div><div id="registers"></div><div id="output"></div></div></div>';
-	$('#container').append(c);
-
-	var puter = makePuter(data);
-	printIt('<h2>Running ' + name + '</h2>');
-
-	displayDisassembly(data);
-
+	puter.loadCode(data);
+	displayDisassembly(data, puter.PC);
 
 	try
 	{
@@ -358,5 +354,3 @@ function execute(name, data) {
 function printIt(s) {
 	$("#output").append("<div>" + s + "</div>");
 }
-
-execute('test', gProgram);

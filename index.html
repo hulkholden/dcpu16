@@ -4,59 +4,141 @@
     <meta charset="utf-8">
     <link rel="stylesheet" href="bootstrap.min.css">
 
-    <title>0x10c</title>
+    <title>0x10c DCPU-16 Emulator</title>
   </head>
   <body>
     <div class="container" id="container">
-      <div class="row"><div class="span12">
-        <h1>0x10c Emulator</h1>
+      <div class="row">
+        <div class="span12">
+          <h1><a href="http://0x10c.com/">0x10c</a> <a href="http://0x10c.com/doc/dcpu-16.txt">DCPU-16</a> Emulator</h1>
+        </div>
       </div>
 
-      <!--
-      <div class="row"><div class="span12">
-        <div id="form">
-          <form id='login_form' action='javascript:doExecute()'>
-            <fieldset>
-              <legend>Choose a file to load and run</legend>
-              <div class="clearfix">
-                <label for="fileInput">Filename</label>
-                <div class="input">
-                  <input class="input-file" id="fileInput" name="fileInput" type="file" />
+      <div class="row">
+        <div class="span12">
+          <div id="form">
+            <form action='javascript:doExecute()'>
+              <fieldset>
+                <div class="control-group">
+                  <label class="control-label" for="codearea">Code</label>
+                  <div class="controls">
+                    <textarea class="input-xxlarge" id="codearea" rows=8>
+0000: 7c01 0030 7de1 1000 0020 7803 1000 c00d
+0008: 7dc1 001a a861 7c01 2000 2161 2000 8463
+0010: 806d 7dc1 000d 9031 7c10 0018 7dc1 001a
+0018: 9037 61c1 7dc1 001a 
+                    </textarea>
+                  </div>
                 </div>
-              </div>
-              <div class="actions">
-                <input type="submit" class="btn primary" value="Load Program">&nbsp;<button type="reset" class="btn">Cancel</button>
-              </div>
-            </fieldset>
-          </form>  
+                <div class="control-label" class="control-group">
+                  <label for="fileInput">Filename</label>
+                  <div class="controls">
+                    <input class="input-file" id="fileInput" name="fileInput" type="file" />
+                  </div>
+                </div>
+                <div class="form-actions">
+                  <!-- input type="submit" class="btn btn-primary" value="Load">&nbsp;-->
+                  <button class="btn" onclick="load()">Load</button>&nbsp;
+                  <button class="btn" onclick="reset()">Reset</button>&nbsp;
+                  <button class="btn" onclick="step()">Step</button>&nbsp;
+                  <button class="btn btn-primary" onclick="run()">Run</button>&nbsp;
+                </div>
+              </fieldset>
+            </form>  
+          </div>
         </div>
-      </div></div>
-      -->
+      </div>
+
+      <div class="row">
+        <div class="span12">
+          <div id="registers"></div>
+          <div id="disasm"></div>
+          <div id="output"></div>
+        </div>
+      </div>
+
     </div>
     <script src="jquery-1.6.4.min.js"></script>
-    <script src="0x10c.js"></script>
+    <script src="dcpu16.js"></script>
 
     <script>
+    var puter = makePuter();
+    load();
+
     function doExecute() {
       var f = document.getElementById("fileInput");
-      var file = f.files[0];
-      var name = file.fileName;
-      var size = file.fileSize;
+      if (f.files.length > 0) {
+        var file = f.files[0];
+        var name = file.fileName;
+        var size = file.fileSize;
 
-      var reader = new FileReader();
+        var reader = new FileReader();
 
-      reader.onerror = function(e) {
-        alert('error');
+        reader.onerror = function(e) {
+          alert('error');
+        }
+
+        // Closure to capture the file information.
+        reader.onload = function(e) {
+            //puter.setName(name);
+            gProgram = e.target.result;
+            reset();
+        };
+
+        // Read in the image file as a data URL.
+        reader.readAsArrayBuffer(file);
+      }
+    }
+
+    function load() {
+      var t = $('#codearea').val();
+      var lines = t.split('\n');
+
+      var data = [];
+
+      for (var i = 0; i < lines.length; ++i) {
+        var line = lines[i];
+
+        // Strip anything up to the first colon (this is colum for address)
+        var c = line.indexOf(':');
+        if (c >= 0)
+          line = line.substr(c+2);
+
+        var vals = line.split(' ');
+        for (var v = 0; v < vals.length; ++v) {
+          if (vals[v]) {
+            data.push( parseInt(vals[v], 16) );
+          }
+        }
       }
 
-      // Closure to capture the file information.
-      reader.onload = function(e) {
-          execute(name, e.target.result);
-      };
+      var buf = new Uint16Array(data.length);
+      for (var i = 0; i < data.length; ++i)
+        buf[i] = data[i];
 
-      // Read in the image file as a data URL.
-      reader.readAsArrayBuffer(file);
+      gProgram = buf;
+      reset();
     }
+
+    function reset() {
+      // reload program state
+      puter.loadCode(gProgram);
+      displayDisassembly(gProgram, puter.PC);
+      displayState(puter);
+    }
+
+    function step() {
+      puter.run(1);
+      displayDisassembly(gProgram, puter.PC);
+      displayState(puter);
+    }
+
+    function run() {
+      puter.run(10000);
+      displayDisassembly(gProgram, puter.PC);
+      displayState(puter);
+    }
+
     </script>
 
   </body>
