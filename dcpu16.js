@@ -330,26 +330,33 @@ function displayState(puter) {
 	$('#registers').html($table);
 }
 
-function execute(puter, data) {
+function parseBinary(text) {
 
-	puter.loadCode(data);
-	displayDisassembly(data, puter.PC);
+  var lines = text.split('\n');
+  var data = [];
 
-	try
-	{
-		puter.run(10000);
+  for (var i = 0; i < lines.length; ++i) {
+    var line = lines[i];
 
-		displayState(puter);
+    // Strip anything up to the first colon (this is colum for address)
+    var c = line.indexOf(':');
+    if (c >= 0)
+      line = line.substr(c+2);
 
-	}
-	catch(e)
-	{
-		printIt( 'Exception: ' + e );
-	}
+    var vals = line.split(' ');
+    for (var v = 0; v < vals.length; ++v) {
+      if (vals[v]) {
+        data.push( parseInt(vals[v], 16) );
+      }
+    }
+  }
 
-	printIt("Halted");
+  var buf = new Uint16Array(data.length);
+  for (var i = 0; i < data.length; ++i)
+    buf[i] = data[i];
+
+  return buf;
 }
-
 
 function printIt(s) {
 	$("#output").append("<div>" + s + "</div>");

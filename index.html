@@ -4,13 +4,13 @@
     <meta charset="utf-8">
     <link rel="stylesheet" href="bootstrap.min.css">
 
-    <title>0x10c DCPU-16 Emulator</title>
+    <title>DCPU-16 Emulator</title>
   </head>
   <body>
     <div class="container" id="container">
       <div class="row">
         <div class="span12">
-          <h1><a href="http://0x10c.com/">0x10c</a> <a href="http://0x10c.com/doc/dcpu-16.txt">DCPU-16</a> Emulator</h1>
+          <h1><a href="http://0x10c.com/doc/dcpu-16.txt">DCPU-16</a> Emulator for <a href="http://0x10c.com/">0x10c</a></h1>
         </div>
       </div>
 
@@ -64,6 +64,14 @@
     <script src="dcpu16.js"></script>
 
     <script>
+
+    // Load state from localStorage
+    var prev_code = localStorage.getItem('code');
+    if (prev_code) {
+      $('#codearea').val(prev_code);
+      gProgram = parseBinary(prev_code);
+    }
+
     var puter = makePuter();
     load();
 
@@ -94,31 +102,8 @@
 
     function load() {
       var t = $('#codearea').val();
-      var lines = t.split('\n');
-
-      var data = [];
-
-      for (var i = 0; i < lines.length; ++i) {
-        var line = lines[i];
-
-        // Strip anything up to the first colon (this is colum for address)
-        var c = line.indexOf(':');
-        if (c >= 0)
-          line = line.substr(c+2);
-
-        var vals = line.split(' ');
-        for (var v = 0; v < vals.length; ++v) {
-          if (vals[v]) {
-            data.push( parseInt(vals[v], 16) );
-          }
-        }
-      }
-
-      var buf = new Uint16Array(data.length);
-      for (var i = 0; i < data.length; ++i)
-        buf[i] = data[i];
-
-      gProgram = buf;
+      localStorage.setItem('code', t);
+      gProgram = parseBinary(t);
       reset();
     }
 
