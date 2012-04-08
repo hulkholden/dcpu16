@@ -1,0 +1,12 @@
+A javascript DCPU-16 emulator for 0x10c (http://0x10c.com)
+
+Specs are at http://0x10c.com/doc/dcpu-16.txt.
+
+I run via node.js:
+
+> node server.js
+Then hit http://localhost:8124/0x10c.html
+
+(server.js is the biggest security violation ever, be warned)
+
+@HulkHolden
