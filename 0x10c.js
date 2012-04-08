@@ -97,9 +97,9 @@ function makeDisassembler(_code) {
 	return disassembler;
 } 
 
-function makePuter(code) {
+function makePuter() {
 
-	var stream = {
+	var puter = {
 		data : new Uint16Array(0x10000),
 		regs : new Uint16Array(8),		// A B C X Y Z I J
 		PC : 0,
@@ -284,20 +284,27 @@ function makePuter(code) {
 		},
 	};
 
-	stream.loadCode(code);
-
-	return stream;
+	return puter;
 }
 
-function displayDisassembly(code) {
+function displayDisassembly(code, cur_pc) {
 	var dis = makeDisassembler(code);
-	var $pre = $('<pre/>');
+	var $pre = $('<table />');
+
+	$pre.append('<tr><th width=100>Address</th><th></th></tr>');
 
 	while (dis.PC < dis.code.length) {
+		var pc = dis.PC;
 		var d = dis.disasm() + '\n';
-		$pre.append(d);
+		if (pc === cur_pc) {
+			$pre.append('<tr bgcolor=eeeee><td>*' + '0x' + pc.toString(16) + '</td><td>' + d + '</td></tr>');
+		} else {
+			$pre.append('<tr><td>' + '0x' + pc.toString(16) + '</td><td>' + d + '</td></tr>');
+		}
 	}
-	$('#disasm').append($pre);
+
+
+	$('#disasm').html($pre);
 
 }
 
@@ -328,16 +335,10 @@ function displayState(puter) {
 	$('#registers').html($table);
 }
 
-function execute(name, data) {
+function execute(puter, data) {
 
-	var c = '<div class="row"><div class="span12"><div id="disasm"></div><div id="registers"></div><div id="output"></div></div></div>';
-	$('#container').append(c);
-
-	var puter = makePuter(data);
-	printIt('<h2>Running ' + name + '</h2>');
-
-	displayDisassembly(data);
-
+	puter.loadCode(data);
+	displayDisassembly(data, puter.PC);
 
 	try
 	{
@@ -358,5 +359,3 @@ function execute(name, data) {
 function printIt(s) {
 	$("#output").append("<div>" + s + "</div>");
 }
-
-execute('test', gProgram);
