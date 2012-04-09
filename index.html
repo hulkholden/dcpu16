@@ -23,10 +23,34 @@
                   <label class="control-label" for="codearea">Code</label>
                   <div class="controls">
                     <textarea class="input-xxlarge" id="codearea" rows=8>
-0000: 7c01 0030 7de1 1000 0020 7803 1000 c00d
-0008: 7dc1 001a a861 7c01 2000 2161 2000 8463
-0010: 806d 7dc1 000d 9031 7c10 0018 7dc1 001a
-0018: 9037 61c1 7dc1 001a 
+; Try some basic stuff
+              SET A, 0x30              ; 7c01 0030
+              SET [0x1000], 0x20       ; 7de1 1000 0020
+              SUB A, [0x1000]          ; 7803 1000
+              IFN A, 0x10              ; c00d 
+                 SET PC, crash         ; 7dc1 001a [*]
+              
+; Do a loopy thing
+              SET I, 10                ; a861
+              SET A, 0x2000            ; 7c01 2000
+:loop         SET [0x2000+I], [A]      ; 2161 2000
+              SUB I, 1                 ; 8463
+              IFN I, 0                 ; 806d
+                 SET PC, loop          ; 7dc1 000d [*]
+
+; Call a subroutine
+              SET X, 0x4               ; 9031
+              JSR testsub              ; 7c10 0018 [*]
+              SET PC, crash            ; 7dc1 001a [*]
+
+:testsub      SHL X, 4                 ; 9037
+              SET PC, POP              ; 61c1
+                
+; Hang forever. X should now be 0x40 if everything went right.
+:crash        SET PC, crash            ; 7dc1 001a [*]
+
+; [*]: Note that these can be one word shorter and one cycle faster by using the short form (0x00-0x1f) of literals,
+;      but my assembler doesn't support short form labels yet.
                     </textarea>
                   </div>
                 </div>
@@ -65,19 +89,21 @@
 
     <script>
 
+    var dcpu = DCPU16();
+    var puter = dcpu.makePuter();
+
     // Load state from localStorage
     var prev_code = localStorage.getItem('code');
     if (prev_code) {
       $('#codearea').val(prev_code);
-      gProgram = parseBinary(prev_code);
+      gProgram = dcpu.parseSource(prev_code);
     }
 
-    var puter = makePuter();
     load();
 
     function doExecute() {
       var f = document.getElementById("fileInput");
-      if (f.files.length > 0) {
+      if (f && f.files.length > 0) {
         var file = f.files[0];
         var name = file.fileName;
         var size = file.fileSize;
@@ -103,27 +129,27 @@
     function load() {
       var t = $('#codearea').val();
       localStorage.setItem('code', t);
-      gProgram = parseBinary(t);
+      gProgram = dcpu.parseSource(t);
       reset();
     }
 
     function reset() {
       // reload program state
       puter.loadCode(gProgram);
-      displayDisassembly(gProgram, puter.PC);
-      displayState(puter);
+      dcpu.displayDisassembly(gProgram, puter.PC);
+      dcpu.displayState(puter);
     }
 
     function step() {
       puter.run(1);
-      displayDisassembly(gProgram, puter.PC);
-      displayState(puter);
+      dcpu.displayDisassembly(gProgram, puter.PC);
+      dcpu.displayState(puter);
     }
 
     function run() {
       puter.run(10000);
-      displayDisassembly(gProgram, puter.PC);
-      displayState(puter);
+      dcpu.displayDisassembly(gProgram, puter.PC);
+      dcpu.displayState(puter);
     }
 
     </script>

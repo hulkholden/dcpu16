@@ -1,4 +1,35 @@
 
+function DCPU16() {
+
+var kRegNames = [ 'A', 'B', 'C', 'X', 'Y', 'Z', 'I', 'J'];
+var kOpNames = [
+	'xxx', 'SET', 'ADD', 'SUB', 'MUL', 'DIV', 'MOD', 'SHL',
+	'SHR', 'AND', 'BOR', 'XOR', 'IFE', 'IFN', 'IFG', 'IFB',
+];
+
+function getRegisterIdx(regname) {
+	for (var i = 0; i < kRegNames.length; ++i) {
+		if (kRegNames[i] === regname)
+			return i;
+	}
+
+	return -1;
+}
+
+function getSimpleOpIdx(opname) {
+	// NB: ignore kOpNames[0]
+	for (var i = 1; i < kOpNames.length; ++i) {
+		if (kOpNames[i] === opname)
+			return i;
+	}
+
+	return -1;
+}
+
+function isNumber(n) {
+	return !isNaN(parseInt(n)) && isFinite(n);
+}
+
 function operandHasData(operand) {
 	return (operand >= 0x10 && operand < 0x18) || operand == 0x1e || operand == 0x1f;
 }
@@ -21,26 +52,27 @@ function opLength(op, a, b) {
 	return len;		
 }
 
+function printIt(s) {
+	$("#output").append("<div>" + s + "</div>");
+}
+
+
+var dcpu = {
  
-function makeDisassembler(_code) {
+makeDisassembler : function(_code) {
 	var disassembler = {
 		code : _code,
-		regnames : [ 'A', 'B', 'C', 'X', 'Y', 'Z', 'I', 'J'],
-		ops : [
-			'xxx', 'SET', 'ADD', 'SUB', 'MUL', 'DIV', 'MOD', 'SHL',
-			'SHR', 'AND', 'BOR', 'XOR', 'IFE', 'IFN', 'IFG', 'IFB',
-		],
 		PC : 0,
 
 		operandName : function(operand, operand_data) {
 
 			if (operand >= 0x0 && operand < 0x8) {
-				return this.regnames[operand];
+				return kRegNames[operand];
 			} else if (operand < 0x10) {
-				return '[' + this.regnames[operand - 0x8] + ']';
+				return '[' + kRegNames[operand - 0x8] + ']';
 			} else if (operand < 0x18) {
 				var next_word = this.code[operand_data];
-				return '[0x' + next_word.toString(16) + ' + ' + this.regnames[operand - 0x10] + ']';
+				return '[0x' + next_word.toString(16) + ' + ' + kRegNames[operand - 0x10] + ']';
 
 			} else if (operand < 0x20) {
 				switch(operand)
@@ -68,16 +100,17 @@ function makeDisassembler(_code) {
 
 			if (op == 0) {
 				if (a == 0x1) {
-					return 'JSR ' + this.operandName(b, this.PC);
+					var bdat = this.PC; if (operandHasData(b)) ++this.PC;
+					return 'JSR ' + this.operandName(b, bdat);
 				}
 
 				return 'xxx';
-			} else if (op < this.ops.length) {
+			} else if (op < kOpNames.length) {
 
 				var adat = this.PC; if (operandHasData(a)) ++this.PC;
 				var bdat = this.PC; if (operandHasData(b)) ++this.PC;
 
-				return this.ops[op] + ' ' + this.operandName(a, adat) + ', ' + this.operandName(b, bdat);
+				return kOpNames[op] + ' ' + this.operandName(a, adat) + ', ' + this.operandName(b, bdat);
 			}
 
 			return '???';
@@ -85,9 +118,337 @@ function makeDisassembler(_code) {
 	};
 
 	return disassembler;
-} 
+},
 
-function makePuter() {
+makeAssembler : function() {
+	var kUpperBoundLo       = "A".charCodeAt(0);
+	var kUpperBoundHi       = "Z".charCodeAt(0);
+	var kLowerBoundLo       = "a".charCodeAt(0);
+	var kLowerBoundHi       = "z".charCodeAt(0);
+	var kNumberBoundLo      = "0".charCodeAt(0);
+	var kNumberBoundHi      = "9".charCodeAt(0);
+	var kUnderscore         = "_".charCodeAt(0);
+	var kComma              = ",".charCodeAt(0);
+	var kColon              = ":".charCodeAt(0);
+	var kSemiColon          = ";".charCodeAt(0);
+	var kSpace              = " ".charCodeAt(0);
+	var kTab                = "\t".charCodeAt(0);
+	var kLeftSquareBracket  = "[".charCodeAt(0);
+	var kRightSquareBracket = "]".charCodeAt(0);
+
+	function isLabelChar(c) {
+		return (c >= kUpperBoundLo  && c <= kUpperBoundHi) ||
+		       (c >= kLowerBoundLo  && c <= kLowerBoundHi) ||
+		       (c >= kNumberBoundLo && c <= kNumberBoundHi) ||
+		       c == kUnderscore;
+	}
+
+	function isOpcodeChar(c) {
+		return (c >= kUpperBoundLo  && c <= kUpperBoundHi) ||
+		       (c >= kLowerBoundLo  && c <= kLowerBoundHi);
+	}	
+
+	function isWhitespace(c) {
+		return c == kSpace || c == kTab;
+	}
+
+	// Return list of operand and data values. If data value resolves to a string, it's a label which needs to be mapped onto an address.
+	function packInstruction(instruction, labels) {
+
+		var op_idx = getSimpleOpIdx(instruction.op);
+
+		var r = [];
+
+		if (op_idx > 0) {
+			if (instruction.operands.length != 2)
+				throw {name:'ParseError', message:'Expecting 2 operands'};
+
+			var opa = instruction.operands[0];
+			var opb = instruction.operands[1];
+
+			var a = packOperand(opa, labels);
+			var b = packOperand(opb, labels);
+
+			r.push( (b<<10) | (a<<4) | op_idx );
+			if (opa.hasOwnProperty('data'))
+					r.push(opa.data);
+			if (opb.hasOwnProperty('data'))
+				r.push(opb.data);				
+			return r;
+		} else {
+			if (instruction.op === 'JSR') {
+				if (instruction.operands.length != 1)
+					throw {name:'ParseError', message:'Expecting 1 operand'};
+
+				var opa = instruction.operands[0];
+				var b = packOperand(opa, labels);
+
+				var a = 0x1;		// JSR
+				r.push( (b<<10) | (a<<4) | 0x00 );
+				if (opa.hasOwnProperty('data'))
+					r.push(opa.data);
+				return r;
+			}
+		}
+
+		throw {name:'ParseError', message:"Unknown opcode '" + instruction.op + "'"};
+	}
+
+	function packOperand(operand, labels) {
+
+		var a = operand.a;
+
+		if (operand.hasOwnProperty('b')) {
+			var b = operand.b;
+
+			var rega = getRegisterIdx(a);
+			var regb = getRegisterIdx(b);
+			var val;
+			var reg;
+			if (rega >= 0 && regb >= 0) {
+				throw {name:'ParseError', message:"No operand which takes two registers"};
+			} else if (rega >= 0 && isNumber(b)) {
+				reg = rega;
+				val = parseInt(b);
+			} else if (regb >= 0 && isNumber(a)) {
+				reg = regb;
+				val = parseInt(a);
+			} else {
+				throw {name:'ParseError', message:"No operand which takes two literals"};
+			}
+
+			if (val > 0) {
+				operand.data = val;		// next_word
+				return 0x10 + reg;
+			} else {
+				return 0x08 + reg;
+			}
+		} else {
+			var reg = getRegisterIdx(a);
+			if (reg >= 0) {
+				return reg + (operand.is_memory_access ? 0x08 : 0x00);
+			} else if (a === 'POP' || a === 'pop' || a === '[SP++]') {
+				return 0x18;
+			} else if (a === 'PEEK' || a === 'peek' || a === '[SP]') {
+				return 0x19;
+			} else if (a === 'PUSH' || a === 'push' || a === '[--SP') {
+				return 0x1a;
+			} else if (a === 'SP' || a === 'sp') {
+				return 0x1b;
+			} else if (a === 'PC' || a === 'pc') {
+				return 0x1c;
+			} else if (a === 'O' || a === 'o') {
+				return 0x1d;
+			} else {
+				var val;
+				var is_label = 0;
+				if (isNumber(a)) {
+					val = parseInt(a);
+				} else {
+					if (labels.hasOwnProperty(a)) {
+						is_label = 1;
+						val = a;		// address filled in later, set to label string now
+					} else {
+						throw {name:'ParseError', message:"Unknown label '" + a + "'"};
+					}
+				}
+				if (operand.is_memory_access) {
+					operand.data = val;	// next_word
+					return 0x1e;
+				} else if (is_label || val >= 0x20) {
+					operand.data = val; // next_word
+					return 0x1f;
+				} else {
+					return 0x20 + val;
+				}	
+			}
+		}
+
+		throw {name:'ParseError', message:'Unhandled case'};
+	}
+
+	function makeLexer(line) {
+
+		var i = 0;
+		var end = line.length;
+
+		var lexer = {
+
+			popChar : function() {
+				return i < end ? line.charCodeAt(i++) : -1;
+			},
+
+			peekChar : function() {
+				return i < end ? line.charCodeAt(i) : -1;
+			},
+
+			empty : function() {
+				return i >= end;
+			},
+
+			getLabel : function() {
+				var b = i;
+				while(i < end && isLabelChar(line.charCodeAt(i)))
+					++i;
+
+				return i > b ? line.substr(b, i-b) : null;
+			},
+
+			getOpCode : function() {
+				this.skipWhite();
+
+				var b = i;
+				while(i < end && isOpcodeChar(line.charCodeAt(i)))
+					++i;
+
+				return i > b ? line.substr(b, i-b) : null;
+			},
+
+			getOperand : function() {
+				if(i >= end)
+					return null;
+
+				this.skipWhite();
+
+				var text = '';
+				var is_memory_access = 0;
+
+				if (line.charCodeAt(i) == kLeftSquareBracket) {
+
+					is_memory_access = 1;
+
+					++i;	// Left bracket
+					var b = i;
+					while(i < end && line.charCodeAt(i) != kRightSquareBracket)
+						++i;						
+
+					if (i >= end)
+						throw {name:'ParseError', message:"Missing ']'"};
+
+					text = line.substr(b, i-b);
+
+					++i;	// Right bracket
+
+				} else {
+					var b = i;
+					while(i < end) {
+						var c = line.charCodeAt(i);
+						if (c == kComma || c == kSemiColon)
+							break;
+						++i;
+					}
+					text = line.substr(b, i-b);
+				}
+
+				var operand = {'is_memory_access':is_memory_access};
+
+				// Look for an operand of the form REG+Literal or Literal+REG (avoid matchi on '[SP++])
+				var plusidx = text.indexOf('+');
+				if (plusidx >= 0 && text.indexOf('+', plusidx+1) < 0) {
+
+					if (!is_memory_access) {
+						throw {name:'ParseError', message:'This form is only valid for memory access: [REG+literal]'};
+					}
+
+					operand.a = $.trim( text.substring(0, plusidx) );
+					operand.b = $.trim( text.substring(plusidx+1) );
+				} else {
+					operand.a = $.trim( text );
+				}
+
+				return operand;
+			},
+
+
+			skipWhite : function() {
+				while(i < end && isWhitespace(line.charCodeAt(i)))
+					++i;
+			},
+		};
+
+		return lexer;
+	}
+
+	var assembler = {
+
+		instructions : [],
+		labels : {},			// map of labelname -> instruction idx
+
+		parseLine : function(line) {
+
+			var lexer = makeLexer(line);
+
+			if (lexer.empty())
+				return;
+
+			// Check for a label here
+			if (lexer.peekChar() == kColon) {
+				lexer.popChar();
+
+				var label = lexer.getLabel();
+				if (!label)
+					throw {name:'ParseError', message:'Expecting a label'};
+
+				this.labels[label] = this.instructions.length;
+			}
+
+			// Check for opcode
+			var opcode = lexer.getOpCode();
+			if (opcode) {
+				var instruction = {op: opcode, operands: []};
+				this.instructions.push(instruction);
+
+				while (1) {
+					var operand = lexer.getOperand();
+					if (!operand)
+						break;
+
+					instruction.operands.push(operand);
+	
+					lexer.skipWhite();
+					if (lexer.peekChar() != kComma)
+						break;
+					lexer.popChar();
+				}
+			}
+		},
+
+		finalise : function() {
+
+			var buf = [];
+			for (var i = 0; i < this.instructions.length; ++i) {
+				var instruction = this.instructions[i];
+				var r = packInstruction(instruction, this.labels);
+
+				instruction.address = buf.length;
+				buf = buf.concat( r );
+			}
+
+			// second pass to remap label data values
+			for (var i = 0; i < buf.length; ++i) {
+				if ((typeof buf[i]) === 'string') {
+					var label = buf[i];
+					if (this.labels.hasOwnProperty(label)) {
+						var instruction_idx = this.labels[label];
+						buf[i] = this.instructions[instruction_idx].address;
+					} else {
+						throw {name:'ParseError', message:"Undefined label '" + label + '"'};
+					}
+				}
+			}
+
+		  	var code = new Uint16Array(buf.length);
+		  	for (var i = 0; i < buf.length; ++i)
+		  		code[i] = buf[i];
+
+			return code;
+		},
+	};
+
+	return assembler;
+},
+ 
+makePuter : function() {
 
 	var puter = {
 		data : new Uint16Array(0x10000),
@@ -96,8 +457,6 @@ function makePuter() {
 		SP : 0xffff,
 		O : 0,
 		CondExec : 1,
-
-		regnames : [ 'A', 'B', 'C', 'X', 'Y', 'Z', 'I', 'J'],
 
 		loadCode :  function(code) {
 			for (var i = 0; i < code.length; ++i) {
@@ -273,10 +632,10 @@ function makePuter() {
 	};
 
 	return puter;
-}
+},
 
-function displayDisassembly(code, cur_pc) {
-	var dis = makeDisassembler(code);
+displayDisassembly : function(code, cur_pc) {
+	var dis = this.makeDisassembler(code);
 	var $pre = $('<table />');
 
 	$pre.append('<tr><th width=100></th><th></th><th></th></tr>');
@@ -300,10 +659,9 @@ function displayDisassembly(code, cur_pc) {
 
 
 	$('#disasm').html($pre);
+},
 
-}
-
-function displayState(puter) {
+displayState : function(puter) {
 	var $table = $('<table class="table table-condensed" style="table-layout:fixed" />');
 
 	var $row = $('<tr />');
@@ -311,7 +669,7 @@ function displayState(puter) {
 	$row.append('<th>SP</th>');
 	$row.append('<th>O</th>');
 	for (var i  = 0; i < 8; ++i ) {
-		$row.append('<th>' + puter.regnames[i] + '</th>');
+		$row.append('<th>' + kRegNames[i] + '</th>');
 	}
 
 	var $thead = $('<thead />');
@@ -328,9 +686,21 @@ function displayState(puter) {
 
 	$table.append($row);
 	$('#registers').html($table);
-}
+},
 
-function parseBinary(text) {
+parseSource : function(text) {
+
+	var assembler = this.makeAssembler();
+
+	var lines = text.split('\n');
+	for (var i = 0; i < lines.length; ++i) {
+		var line = lines[i];
+		assembler.parseLine(line);
+	}
+	return assembler.finalise();
+},
+
+parseBinary : function(text) {
 
   var lines = text.split('\n');
   var data = [];
@@ -356,8 +726,11 @@ function parseBinary(text) {
     buf[i] = data[i];
 
   return buf;
-}
+},
 
-function printIt(s) {
-	$("#output").append("<div>" + s + "</div>");
-}
+};
+
+return dcpu;
+
+} // dcpu16
+
