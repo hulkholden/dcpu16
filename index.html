@@ -11,75 +11,82 @@
       <div class="row">
         <div class="span12">
           <h1>DCPU-16 Emulator for <a href="http://0x10c.com/">0x10c</a></h1>
-          <p>Yet another Javascript <a href="http://0x10c.com/doc/dcpu-16.txt">DCPU-16</a> assembler/disassembler/emulator. Enter/edit code below. Hit Load to assemble, Step and Run to execute the code. Code <a href="https://github.com/hulkholden/dcpu16">here</a>.
+          <p>Yet another Javascript <a href="http://0x10c.com/doc/dcpu-16.txt">DCPU-16</a> assembler/disassembler/emulator. Enter/edit code below, assembled code live updates. Use step and Run to execute the code. Code <a href="https://github.com/hulkholden/dcpu16">here</a>.
         </div>
       </div>
 
       <div class="row">
-        <div class="span12">
-          <div id="form">
-            <form action='javascript:false'>
-              <fieldset>
-                <div class="control-group">
-                  <label class="control-label" for="codearea">Code</label>
-                  <div class="controls">
-                    <textarea class="input-xxlarge" id="codearea" rows=8>
+        <div class="span8">
+
+          <form action='javascript:false'>
+            <fieldset>
+              <div class="control-group">
+                <label class="control-label" for="codearea">Code</label>
+                <div class="controls">
+                  <textarea class="input-xxlarge" id="codearea" rows=20>
 ; Try some basic stuff
-              SET A, 0x30              ; 7c01 0030
-              SET [0x1000], 0x20       ; 7de1 1000 0020
-              SUB A, [0x1000]          ; 7803 1000
-              IFN A, 0x10              ; c00d 
-                 SET PC, crash         ; 7dc1 001a [*]
-              
+            SET A, 0x30              ; 7c01 0030
+            SET [0x1000], 0x20       ; 7de1 1000 0020
+            SUB A, [0x1000]          ; 7803 1000
+            IFN A, 0x10              ; c00d 
+               SET PC, crash         ; 7dc1 001a [*]
+            
 ; Do a loopy thing
-              SET I, 10                ; a861
-              SET A, 0x2000            ; 7c01 2000
+            SET I, 10                ; a861
+            SET A, 0x2000            ; 7c01 2000
 :loop         SET [0x2000+I], [A]      ; 2161 2000
-              SUB I, 1                 ; 8463
-              IFN I, 0                 ; 806d
-                 SET PC, loop          ; 7dc1 000d [*]
+            SUB I, 1                 ; 8463
+            IFN I, 0                 ; 806d
+               SET PC, loop          ; 7dc1 000d [*]
 
 ; Call a subroutine
-              SET X, 0x4               ; 9031
-              JSR testsub              ; 7c10 0018 [*]
-              SET PC, crash            ; 7dc1 001a [*]
+            SET X, 0x4               ; 9031
+            JSR testsub              ; 7c10 0018 [*]
+            SET PC, crash            ; 7dc1 001a [*]
 
 :testsub      SHL X, 4                 ; 9037
-              SET PC, POP              ; 61c1
-                
+            SET PC, POP              ; 61c1
+              
 ; Hang forever. X should now be 0x40 if everything went right.
 :crash        SET PC, crash            ; 7dc1 001a [*]
 
 ; [*]: Note that these can be one word shorter and one cycle faster by using the short form (0x00-0x1f) of literals,
 ;      but my assembler doesn't support short form labels yet.
-                    </textarea>
-                  </div>
+                  </textarea>
                 </div>
-                <!--
-                <div class="control-label" class="control-group">
-                  <label for="fileInput">Filename</label>
-                  <div class="controls">
-                    <input class="input-file" id="fileInput" name="fileInput" type="file" />
-                  </div>
-                </div>
-                -->
-                <div class="form-actions">
-                  <!-- input type="submit" class="btn btn-primary" value="Load">&nbsp;-->
-                  <button class="btn" onclick="load()">Load</button>&nbsp;
-                  <button class="btn" onclick="step()">Step</button>&nbsp;
-                  <button class="btn btn-primary" onclick="run()">Run</button>&nbsp;
-                </div>
-              </fieldset>
-            </form>  
-          </div>
+              </div>
+            </fieldset>
+          </form>
+
+        </div>
+        <div class="span4">
+          <form action="loadFile()" id="loadform">
+            <fieldset>
+                  <label class="control-label">Load .dasm file:</label>
+                  <input class="input-file" id="fileInput" name="fileInput" type="file" onchange="loadFile()" />
+            </fieldset>
+          </form>
         </div>
       </div>
 
       <div class="row">
         <div class="span12">
-          <div id="registers"></div>
-          <div id="disasm"></div>
           <div id="output"></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="span4">
+
+          <div>
+            <button class="btn" onclick="step()">Step</button>&nbsp;
+            <button class="btn" onclick="run()">Run</button>&nbsp;
+          </div>
+
+          <div id="disasm"></div>
+        </div>
+        <div class="span8">
+          <div id="registers"></div>
         </div>
       </div>
 
@@ -92,16 +99,26 @@
     var dcpu = DCPU16();
     var puter = dcpu.makePuter();
 
+    $(document).ready(function(){
+      $('#codearea').keyup(function(){
+        liveUpdate();
+      });
+    });
+
     // Load state from localStorage
     var prev_code = localStorage.getItem('code');
     if (prev_code) {
       $('#codearea').val(prev_code);
-      gProgram = dcpu.parseSource(prev_code);
     }
 
     load();
 
-    function doExecute() {
+    function liveUpdate() {
+      $('#output').html('');
+      load();
+    }
+
+    function loadFile() {
       var f = document.getElementById("fileInput");
       if (f && f.files.length > 0) {
         var file = f.files[0];
@@ -116,12 +133,15 @@
 
         // Closure to capture the file information.
         reader.onload = function(e) {
-            //puter.setName(name);
-            reset(e.target.result);
+          var code = e.target.result;
+          $('#codearea').val(code);
+          gProgram = dcpu.parseSource(code);
+          reset(e.target.result);
         };
 
         // Read in the image file as a data URL.
-        reader.readAsArrayBuffer(file);
+        //reader.readAsArrayBuffer(file);
+        reader.readAsText(file);
       }
     }
 

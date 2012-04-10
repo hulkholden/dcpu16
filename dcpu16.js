@@ -8,6 +8,8 @@ var kOpNames = [
 ];
 
 function getRegisterIdx(regname) {
+	regname = regname.toUpperCase();
+
 	for (var i = 0; i < kRegNames.length; ++i) {
 		if (kRegNames[i] === regname)
 			return i;
@@ -17,7 +19,9 @@ function getRegisterIdx(regname) {
 }
 
 function getSimpleOpIdx(opname) {
+	opname = opname.toUpperCase();
 	// NB: ignore kOpNames[0]
+
 	for (var i = 1; i < kOpNames.length; ++i) {
 		if (kOpNames[i] === opname)
 			return i;
@@ -155,13 +159,13 @@ makeAssembler : function() {
 	// Return list of operand and data values. If data value resolves to a string, it's a label which needs to be mapped onto an address.
 	function packInstruction(instruction, labels) {
 
-		var op_idx = getSimpleOpIdx(instruction.op);
+		var op_idx = getSimpleOpIdx(instruction.op.text);
 
 		var r = [];
 
 		if (op_idx > 0) {
 			if (instruction.operands.length != 2)
-				throw {name:'ParseError', message:'Expecting 2 operands'};
+				throw {name:'ParseError', message:'Expecting 2 operands', sourceLoc:instruction.sourceLoc};
 
 			var opa = instruction.operands[0];
 			var opb = instruction.operands[1];
@@ -171,14 +175,14 @@ makeAssembler : function() {
 
 			r.push( (b<<10) | (a<<4) | op_idx );
 			if (opa.hasOwnProperty('data'))
-					r.push(opa.data);
+				r.push(opa.data);
 			if (opb.hasOwnProperty('data'))
 				r.push(opb.data);				
 			return r;
 		} else {
-			if (instruction.op === 'JSR') {
+			if (instruction.op.text === 'JSR' || instruction.op.text === 'jsr') {
 				if (instruction.operands.length != 1)
-					throw {name:'ParseError', message:'Expecting 1 operand'};
+					throw {name:'ParseError', message:'Expecting 1 operand', sourceLoc:instruction.sourceLoc};
 
 				var opa = instruction.operands[0];
 				var b = packOperand(opa, labels);
@@ -191,7 +195,7 @@ makeAssembler : function() {
 			}
 		}
 
-		throw {name:'ParseError', message:"Unknown opcode '" + instruction.op + "'"};
+		throw {name:'ParseError', message:"Unknown opcode '" + instruction.op.text + "'", sourceLoc:instruction.op.sourceLoc};
 	}
 
 	function packOperand(operand, labels) {
@@ -206,7 +210,7 @@ makeAssembler : function() {
 			var val;
 			var reg;
 			if (rega >= 0 && regb >= 0) {
-				throw {name:'ParseError', message:"No operand which takes two registers"};
+				throw {name:'ParseError', message:"No operand which takes two registers", sourceLoc:operand.sourceLoc};
 			} else if (rega >= 0 && isNumber(b)) {
 				reg = rega;
 				val = parseInt(b);
@@ -214,7 +218,7 @@ makeAssembler : function() {
 				reg = regb;
 				val = parseInt(a);
 			} else {
-				throw {name:'ParseError', message:"No operand which takes two literals"};
+				throw {name:'ParseError', message:"No operand which takes two literals", sourceLoc:operand.sourceLoc};
 			}
 
 			if (val > 0) {
@@ -249,7 +253,7 @@ makeAssembler : function() {
 						is_label = 1;
 						val = a;		// address filled in later, set to label string now
 					} else {
-						throw {name:'ParseError', message:"Unknown label '" + a + "'"};
+						throw {name:'ParseError', message:"Unknown label '" + a + "'", sourceLoc:operand.sourceLoc};
 					}
 				}
 				if (operand.is_memory_access) {
@@ -264,10 +268,10 @@ makeAssembler : function() {
 			}
 		}
 
-		throw {name:'ParseError', message:'Unhandled case'};
+		throw {name:'ParseError', message:'Unhandled case', sourceLoc:operand.sourceLoc};
 	}
 
-	function makeLexer(line) {
+	function makeLexer(line, sourceLoc) {
 
 		var i = 0;
 		var end = line.length;
@@ -301,7 +305,10 @@ makeAssembler : function() {
 				while(i < end && isOpcodeChar(line.charCodeAt(i)))
 					++i;
 
-				return i > b ? line.substr(b, i-b) : null;
+				if (i <= b)
+					return null
+
+				return {text:line.substr(b, i-b), sourceLoc:{line:sourceLoc.line, col:b, colStart:b, colEnd:i}};
 			},
 
 			getOperand : function() {
@@ -310,12 +317,16 @@ makeAssembler : function() {
 
 				this.skipWhite();
 
+				var operand = {};
+
+				operand.is_memory_access = 0;
+				operand.sourceLoc        = {line:sourceLoc.line, col:i, colStart:i, colEnd:i};
+
 				var text = '';
-				var is_memory_access = 0;
 
 				if (line.charCodeAt(i) == kLeftSquareBracket) {
 
-					is_memory_access = 1;
+					operand.is_memory_access = 1;
 
 					++i;	// Left bracket
 					var b = i;
@@ -323,7 +334,7 @@ makeAssembler : function() {
 						++i;						
 
 					if (i >= end)
-						throw {name:'ParseError', message:"Missing ']'"};
+						throw {name:'ParseError', message:"Missing ']'", sourceLoc:operand.sourceLoc};
 
 					text = line.substr(b, i-b);
 
@@ -340,14 +351,16 @@ makeAssembler : function() {
 					text = line.substr(b, i-b);
 				}
 
-				var operand = {'is_memory_access':is_memory_access};
+				// update the sourceLoc to reflect end
+				// FIXME: this overestimates the end of the second arg: includes whitespace
+				operand.sourceLoc.colEnd = i;
 
 				// Look for an operand of the form REG+Literal or Literal+REG (avoid matchi on '[SP++])
 				var plusidx = text.indexOf('+');
 				if (plusidx >= 0 && text.indexOf('+', plusidx+1) < 0) {
 
-					if (!is_memory_access) {
-						throw {name:'ParseError', message:'This form is only valid for memory access: [REG+literal]'};
+					if (!operand.is_memory_access) {
+						throw {name:'ParseError', message:'This form is only valid for memory access: [REG+literal]', sourceLog:operand.sourceLoc};
 					}
 
 					operand.a = $.trim( text.substring(0, plusidx) );
@@ -373,10 +386,71 @@ makeAssembler : function() {
 
 		instructions : [],
 		labels : {},			// map of labelname -> instruction idx
+		code : null,
 
-		parseLine : function(line) {
+		errorText : '',
 
-			var lexer = makeLexer(line);
+		displayParseError : function(lines, e) {
+			var err = '';
+			if (e.name==='ParseError') {
+
+				if (e.sourceLoc) {
+					var indent = '  ';
+					err += "Error line " + (e.sourceLoc.line+1) + ":" + (e.sourceLoc.col+1) + " : " + e.message + "\n";
+
+					err += indent + lines[e.sourceLoc.line] + "\n";
+
+					if (e.sourceLoc.hasOwnProperty('colStart') && e.sourceLoc.hasOwnProperty('colEnd')) {
+						var i = 0;
+						var t = '';
+						for ( ; i < e.sourceLoc.colStart; ++i )
+							t += ' ';
+						t += '^';
+						++i;
+						for ( ; i+1 < e.sourceLoc.colEnd; ++i )
+							t += '~';
+						if (i > e.sourceLoc.colStart)
+							t += '^';
+
+						err += indent + t + "\n";
+					}
+
+				} else {
+					err += "Error: " + e.message + "\n";
+				}
+			} else {
+				err += "Unhandled exception: " + e.name + ", " + e.message + "\n";
+			}
+
+			this.errorText += err;
+		},	
+
+		assemble : function(text) {
+			var lines = text.split('\n');
+			for (var i = 0; i < lines.length; ++i) {
+				var line = lines[i];
+
+				try {
+					this.parseLine(line, {line:i,col:0});
+				} catch (e) {
+					this.displayParseError(lines, e);
+				}
+			}
+
+			try {
+				this.finalise();
+			} catch (e) {
+				this.displayParseError(lines, e);
+			}
+
+			if (this.errorText.length > 0) {
+				printIt( '<pre>' + this.errorText + '</pre>' );
+			}			
+		},
+
+		parseLine : function(line, sourceLoc) {
+
+			var lexer = makeLexer(line, sourceLoc);
 
 			if (lexer.empty())
 				return;
@@ -387,7 +461,7 @@ makeAssembler : function() {
 
 				var label = lexer.getLabel();
 				if (!label)
-					throw {name:'ParseError', message:'Expecting a label'};
+					throw {name:'ParseError', message:'Expecting a label', sourceLoc:sourceLoc};
 
 				this.labels[label] = this.instructions.length;
 			}
@@ -395,7 +469,7 @@ makeAssembler : function() {
 			// Check for opcode
 			var opcode = lexer.getOpCode();
 			if (opcode) {
-				var instruction = {op: opcode, operands: []};
+				var instruction = {op: opcode, operands: [], sourceLoc:sourceLoc};
 				this.instructions.push(instruction);
 
 				while (1) {
@@ -429,7 +503,7 @@ makeAssembler : function() {
 				if ((typeof buf[i]) === 'string') {
 					var label = buf[i];
 					if (this.labels.hasOwnProperty(label)) {
-						var instruction_idx = this.labels[label];
+							var instruction_idx = this.labels[label];
 						buf[i] = this.instructions[instruction_idx].address;
 					} else {
 						throw {name:'ParseError', message:"Undefined label '" + label + '"'};
@@ -437,11 +511,10 @@ makeAssembler : function() {
 				}
 			}
 
-		  	var code = new Uint16Array(buf.length);
+		  	this.code = new Uint16Array(buf.length);
 		  	for (var i = 0; i < buf.length; ++i)
-		  		code[i] = buf[i];
+		  		this.code[i] = buf[i];
 
-			return code;
 		},
 	};
 
@@ -691,13 +764,8 @@ displayState : function(puter) {
 parseSource : function(text) {
 
 	var assembler = this.makeAssembler();
-
-	var lines = text.split('\n');
-	for (var i = 0; i < lines.length; ++i) {
-		var line = lines[i];
-		assembler.parseLine(line);
-	}
-	return assembler.finalise();
+	assembler.assemble(text);
+	return assembler.code;
 },
 
 parseBinary : function(text) {
@@ -733,4 +801,3 @@ parseBinary : function(text) {
 return dcpu;
 
 } // dcpu16
-
