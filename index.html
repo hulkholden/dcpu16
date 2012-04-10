@@ -10,14 +10,15 @@
     <div class="container" id="container">
       <div class="row">
         <div class="span12">
-          <h1><a href="http://0x10c.com/doc/dcpu-16.txt">DCPU-16</a> Emulator for <a href="http://0x10c.com/">0x10c</a></h1>
+          <h1>DCPU-16 Emulator for <a href="http://0x10c.com/">0x10c</a></h1>
+          <p>Yet another Javascript <a href="http://0x10c.com/doc/dcpu-16.txt">DCPU-16</a> assembler/disassembler/emulator. Enter/edit code below. Hit Load to assemble, Step and Run to execute the code. Code <a href="https://github.com/hulkholden/0x10c">here</a>.
         </div>
       </div>
 
       <div class="row">
         <div class="span12">
           <div id="form">
-            <form action='javascript:doExecute()'>
+            <form action='javascript:false'>
               <fieldset>
                 <div class="control-group">
                   <label class="control-label" for="codearea">Code</label>
@@ -65,7 +66,6 @@
                 <div class="form-actions">
                   <!-- input type="submit" class="btn btn-primary" value="Load">&nbsp;-->
                   <button class="btn" onclick="load()">Load</button>&nbsp;
-                  <button class="btn" onclick="reset()">Reset</button>&nbsp;
                   <button class="btn" onclick="step()">Step</button>&nbsp;
                   <button class="btn btn-primary" onclick="run()">Run</button>&nbsp;
                 </div>
@@ -117,8 +117,7 @@
         // Closure to capture the file information.
         reader.onload = function(e) {
             //puter.setName(name);
-            gProgram = e.target.result;
-            reset();
+            reset(e.target.result);
         };
 
         // Read in the image file as a data URL.
@@ -129,12 +128,12 @@
     function load() {
       var t = $('#codearea').val();
       localStorage.setItem('code', t);
-      gProgram = dcpu.parseSource(t);
-      reset();
+      reset(dcpu.parseSource(t));
     }
 
-    function reset() {
+    function reset(code) {
       // reload program state
+      gProgram = code;
       puter.loadCode(gProgram);
       dcpu.displayDisassembly(gProgram, puter.PC);
       dcpu.displayState(puter);
