@@ -262,19 +262,34 @@ makeAssembler : function() {
 			var regb = getRegisterIdx(b);
 			var val;
 			var reg;
+			var is_label = 0;
 			if (rega >= 0 && regb >= 0) {
 				throw {name:'ParseError', message:"No operand which takes two registers", sourceLoc:operand.sourceLoc};
-			} else if (rega >= 0 && isNumber(b)) {
+			} else if (rega >= 0) {
 				reg = rega;
-				val = parseInt(b);
-			} else if (regb >= 0 && isNumber(a)) {
+				if (isNumber(b)) {
+					val = parseInt(b);
+				} else if (labels.hasOwnProperty(b)) {
+					val = b;
+					is_label = 1;
+				} else {
+					throw {name:'ParseError', message:"Unknown operand form", sourceLoc:operand.sourceLoc};
+				}
+			} else if (regb >= 0) {
 				reg = regb;
-				val = parseInt(a);
+				if (isNumber(a)) {
+					val = parseInt(a);
+				} else if (labels.hasOwnProperty(a)) {
+					val = a;
+					is_label = 1;
+				} else {
+					throw {name:'ParseError', message:"No operand which takes two literals", sourceLoc:operand.sourceLoc};					
+				}
 			} else {
-				throw {name:'ParseError', message:"No operand which takes two literals", sourceLoc:operand.sourceLoc};
+				throw {name:'ParseError', message:"Unknown operand form", sourceLoc:operand.sourceLoc};
 			}
 
-			if (val > 0) {
+			if (is_label || val > 0) {
 				operand.data = val;		// next_word
 				return 0x10 + reg;
 			} else {
@@ -303,14 +318,14 @@ makeAssembler : function() {
 					throw {name:'ParseError', message:"Unexpected string literal", sourceLoc:operand.sourceLoc};
 				} if (isNumber(a)) {
 					val = parseInt(a);
+				} else if (labels.hasOwnProperty(a)) {
+					is_label = 1;	// remember this is a label - have to avoid small value optimisation
+					val = a;		// address filled in later, set to label string now
 				} else {
-					if (labels.hasOwnProperty(a)) {
-						is_label = 1;
-						val = a;		// address filled in later, set to label string now
-					} else {
-						throw {name:'ParseError', message:"Unknown label '" + a + "'", sourceLoc:operand.sourceLoc};
-					}
+					throw {name:'ParseError', message:"Unknown label '" + a + "'", sourceLoc:operand.sourceLoc};
 				}
+
+
 				if (operand.is_memory_access) {
 					operand.data = val;	// next_word
 					return 0x1e;
