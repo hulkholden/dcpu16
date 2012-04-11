@@ -714,7 +714,7 @@ makePuter : function() {
 		data : new Uint16Array(0x10000),
 		regs : new Uint16Array(8),		// A B C X Y Z I J
 		PC : 0,
-		SP : 0xffff,
+		SP : 0,
 		O : 0,
 		CondExec : 1,
 
@@ -731,7 +731,7 @@ makePuter : function() {
 			}
 
 			this.PC = 0;
-			this.SP = 0xffff;
+			this.SP = 0;
 			this.O = 0;
 			this.CondExec = 1;
 		},
