@@ -56,6 +56,15 @@ function opLength(op, a, b) {
 	return len;		
 }
 
+function toBinaryString(v, bits) {
+	if (!bits) bits = 0;
+
+	var t = v.toString(2);
+	while  (t.length < bits)
+		t = '0' + t;
+	return t;
+}
+
 function printIt(s) {
 	$("#output").append("<div>" + s + "</div>");
 }
@@ -738,29 +747,17 @@ displayDisassembly : function(code, cur_pc) {
 },
 
 displayState : function(puter) {
-	var $table = $('<table class="table table-condensed" style="table-layout:fixed" />');
+	var $table = $('<table class="table table-condensed register-table" />');
 
-	var $row = $('<tr />');
-	$row.append('<th>PC</th>');
-	$row.append('<th>SP</th>');
-	$row.append('<th>O</th>');
+	$table.append('<tr><th>Register</th><th>hex</th><th>dec</th><th>bin</th></tr>')
+	$table.append('<tr><td>PC</td><td>0x' + puter.PC.toString(16) + '</td><td>' + puter.PC.toString(16) + '</td><td>' + toBinaryString(puter.PC, 16) + '</td></tr>' );
+	$table.append('<tr><td>SP</td><td>0x' + puter.SP.toString(16) + '</td><td>' + puter.SP.toString(10) + '</td><td>' + toBinaryString(puter.SP, 16) + '</td></tr>' );
+	$table.append('<tr><td>O</td><td>0x' + puter.O.toString(16) + '</td><td>' + puter.O.toString(10) + '</td><td>' + toBinaryString(puter.O, 16) + '</td></tr>' );
 	for (var i  = 0; i < 8; ++i ) {
-		$row.append('<th>' + kRegNames[i] + '</th>');
+		var val = puter.regs[i];
+		$table.append('<tr><td>' + kRegNames[i] + '</td><td>0x' + val.toString(16) + '</td><td>' + val.toString(10) + '</td><td>' + toBinaryString(val, 16) + '</td></tr>');
 	}
 
-	var $thead = $('<thead />');
-	$thead.append($row);
-	$table.append($thead);
-
-	$row = $('<tr />');
-	$row.append('<td>0x' + puter.PC.toString(16) + '</td>');
-	$row.append('<td>0x' + puter.SP.toString(16) + '</td>');
-	$row.append('<td>0x' + puter.O.toString(16)  + '</td>');
-	for (var i  = 0; i < 8; ++i ) {
-		$row.append('<td>0x' + puter.regs[i].toString(16) + '</td>');
-	}
-
-	$table.append($row);
 	$('#registers').html($table);
 },
 

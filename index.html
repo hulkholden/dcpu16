@@ -2,7 +2,11 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
+
     <link rel="stylesheet" href="bootstrap.min.css">
+ <style type="text/css">
+   .register-table th, .register-table td { text-align: right }
+ </style>
 
     <title>DCPU-16 Emulator</title>
   </head>
@@ -79,16 +83,20 @@
       </div>
 
       <div class="row">
-        <div class="span4">
 
+        <div class="span12">
           <div>
             <button class="btn" onclick="step()">Step</button>&nbsp;
             <button class="btn" onclick="run()">Run</button>&nbsp;
           </div>
+        </div>
+      </div>
 
+      <div class="row">
+        <div class="span7">
           <div id="disasm"></div>
         </div>
-        <div class="span8">
+        <div class="span5">
           <div id="registers"></div>
         </div>
       </div>
