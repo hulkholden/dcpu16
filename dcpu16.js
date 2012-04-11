@@ -19,7 +19,6 @@ function getRegisterIdx(regname) {
 }
 
 function getSimpleOpIdx(opname) {
-	opname = opname.toUpperCase();
 	// NB: ignore kOpNames[0]
 
 	for (var i = 1; i < kOpNames.length; ++i) {
@@ -146,11 +145,13 @@ makeAssembler : function() {
 	var kSemiColon          = ";".charCodeAt(0);
 	var kSpace              = " ".charCodeAt(0);
 	var kTab                = "\t".charCodeAt(0);
+	var kHash               = "#".charCodeAt(0);
 	var kLeftSquareBracket  = "[".charCodeAt(0);
 	var kRightSquareBracket = "]".charCodeAt(0);
-	var kHash               = "#".charCodeAt(0);
 	var kLeftCurlyBrace     = "{".charCodeAt(0);
 	var kRightCurlyBrace    = "}".charCodeAt(0);
+	var kLeftParens         = "(".charCodeAt(0);
+	var kRightParens        = ")".charCodeAt(0);
 
 	function isLabelChar(c) {
 		return (c >= kUpperBoundLo  && c <= kUpperBoundHi) ||
@@ -171,7 +172,9 @@ makeAssembler : function() {
 	// Return list of operand and data values. If data value resolves to a string, it's a label which needs to be mapped onto an address.
 	function packInstruction(instruction, labels) {
 
-		var op_idx = getSimpleOpIdx(instruction.op.text);
+		var opname = instruction.op.text.toUpperCase();
+
+		var op_idx = getSimpleOpIdx(opname);
 
 		var r = [];
 
@@ -192,7 +195,7 @@ makeAssembler : function() {
 				r.push(opb.data);				
 			return r;
 		} else {
-			if (instruction.op.text === 'JSR' || instruction.op.text === 'jsr') {
+			if (opname === 'JSR') {
 				if (instruction.operands.length != 1)
 					throw {name:'ParseError', message:'Expecting 1 operand', sourceLoc:instruction.sourceLoc};
 
@@ -204,7 +207,7 @@ makeAssembler : function() {
 				if (opa.hasOwnProperty('data'))
 					r.push(opa.data);
 				return r;
-			} else if (instruction.op.text === 'DAT' || instruction.op.text === 'dat') {
+			} else if (opname === 'DAT') {
 
 				for (var i = 0; i < instruction.operands.length; ++i) {
 					var operand = instruction.operands[i];
@@ -552,6 +555,12 @@ makeAssembler : function() {
 			// Check for opcode
 			var opcode = lexer.getOpCode();
 			if (opcode) {
+
+				lexer.skipWhite();
+				if (lexer.peekChar() == kLeftParens) {
+					throw {name:'ParseError', message:'Macros not supported', sourceLoc:sourceLoc};
+				}
+
 				var instruction = {op: opcode, operands: [], sourceLoc:sourceLoc};
 				this.instructions.push(instruction);
 
@@ -567,6 +576,16 @@ makeAssembler : function() {
 						break;
 					lexer.popChar();
 				}
+
+				// pseudo ops
+				if (opcode.text.toUpperCase() == 'JMP') {
+					if (instruction.operands.length != 1)
+						throw {name:'ParseError', message:'Expecting 1 operand', sourceLoc:instruction.sourceLoc};
+
+					instruction.op = {text:'SET', sourceLoc:instruction.op.sourceLoc};
+					instruction.operands = [ {a:'PC', is_memory_access:0, sourceLoc:instruction.sourceLoc}, instruction.operands[0] ];
+				}
+
 			} else {
 				throw {name:'ParseError', message:'Expecting a label or opcode', sourceLoc:sourceLoc};
 			}
