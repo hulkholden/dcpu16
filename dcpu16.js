@@ -524,6 +524,7 @@ makeAssembler : function() {
 makePuter : function() {
 
 	var puter = {
+		code : null,
 		data : new Uint16Array(0x10000),
 		regs : new Uint16Array(8),		// A B C X Y Z I J
 		PC : 0,
@@ -532,6 +533,8 @@ makePuter : function() {
 		CondExec : 1,
 
 		loadCode :  function(code) {
+			this.code = code;	// Keep track of the original code. 
+
 			for (var i = 0; i < code.length; ++i) {
 				this.data[i] = code[i];
 			};

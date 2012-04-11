@@ -23,7 +23,7 @@
               <div class="control-group">
                 <label class="control-label" for="codearea">Code</label>
                 <div class="controls">
-                  <textarea class="input-xxlarge" id="codearea" rows=20>
+                  <textarea class="input-xxlarge" id="sample_codearea" style="display: none">
 ; Try some basic stuff
             SET A, 0x30              ; 7c01 0030
             SET [0x1000], 0x20       ; 7de1 1000 0020
@@ -53,6 +53,8 @@
 ; [*]: Note that these can be one word shorter and one cycle faster by using the short form (0x00-0x1f) of literals,
 ;      but my assembler doesn't support short form labels yet.
                   </textarea>
+                  <textarea class="input-xxlarge" id="codearea" rows=20>
+                  </textarea>   
                 </div>
               </div>
             </fieldset>
@@ -60,10 +62,11 @@
 
         </div>
         <div class="span4">
-          <form action="loadFile()" id="loadform">
+          <form onsubmit="return false" id="loadform">
             <fieldset>
                   <label class="control-label">Load .dasm file:</label>
                   <input class="input-file" id="fileInput" name="fileInput" type="file" onchange="loadFile()" />
+                  <button class="btn" onclick="loadSample()">Load Sample</button>&nbsp;
             </fieldset>
           </form>
         </div>
@@ -117,10 +120,15 @@
     });
 
     function liveUpdate() {
+      var source = $('#codearea').val();
+
       $('#output').html('');
-      var t = $('#codearea').val();
-      localStorage.setItem('code', t);
-      reset(dcpu.parseSource(t));
+      localStorage.setItem('code', source);
+      
+      // reload program state
+      var code = dcpu.parseSource(source);
+      puter.loadCode(code);
+      refreshDisplay();
     }
 
     function loadFile() {
@@ -133,15 +141,12 @@
         var reader = new FileReader();
 
         reader.onerror = function(e) {
-          alert('error');
+          alert('error loading file');
         }
-
-        // Closure to capture the file information.
         reader.onload = function(e) {
-          var code = e.target.result;
-          $('#codearea').val(code);
-          gProgram = dcpu.parseSource(code);
-          reset(e.target.result);
+          var source = e.target.result;
+          $('#codearea').val(source);
+          liveUpdate();
         };
 
         // Read in the image file as a data URL.
@@ -150,24 +155,24 @@
       }
     }
 
-    function reset(code) {
-      // reload program state
-      gProgram = code;
-      puter.loadCode(gProgram);
-      dcpu.displayDisassembly(gProgram, puter.PC);
-      dcpu.displayState(puter);
-    }
-
     function step() {
       puter.run(1);
-      dcpu.displayDisassembly(gProgram, puter.PC);
-      dcpu.displayState(puter);
+      refreshDisplay();
     }
 
     function run() {
       puter.run(10000);
-      dcpu.displayDisassembly(gProgram, puter.PC);
-      dcpu.displayState(puter);
+      refreshDisplay();
+    }
+
+    function refreshDisplay() {
+      dcpu.displayDisassembly(puter.code, puter.PC);
+      dcpu.displayState(puter);      
+    }
+
+    function loadSample() {
+        $('#codearea').val($('#sample_codearea').val());
+        liveUpdate();
     }
 
     </script>
