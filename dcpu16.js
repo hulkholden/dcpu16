@@ -407,13 +407,15 @@ makeAssembler : function() {
 					var indent = '  ';
 					err += "Error line " + (e.sourceLoc.line+1) + ":" + (e.sourceLoc.col+1) + " : " + e.message + "\n";
 
-					err += indent + lines[e.sourceLoc.line] + "\n";
+					var line = lines[e.sourceLoc.line];
+
+					err += indent + line + "\n";
 
 					if (e.sourceLoc.hasOwnProperty('colStart') && e.sourceLoc.hasOwnProperty('colEnd')) {
 						var i = 0;
 						var t = '';
 						for ( ; i < e.sourceLoc.colStart; ++i )
-							t += ' ';
+							t += line.charCodeAt(i) == kTab ? '\t' : ' ';
 						t += '^';
 						++i;
 						for ( ; i+1 < e.sourceLoc.colEnd; ++i )
