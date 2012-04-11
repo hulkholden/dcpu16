@@ -204,6 +204,23 @@ makeAssembler : function() {
 				if (opa.hasOwnProperty('data'))
 					r.push(opa.data);
 				return r;
+			} else if (instruction.op.text === 'DAT' || instruction.op.text === 'dat') {
+
+				for (var i = 0; i < instruction.operands.length; ++i) {
+					var operand = instruction.operands[i];
+					if (operand.hasOwnProperty('b')) {
+						throw {name:'ParseError', message:'Expecting simple operand', sourceLoc:operand.sourceLoc};
+					}
+					var a = operand.a;
+					if (!isNumber(a)) {
+						throw {name:'ParseError', message:'Expecting a literal', sourceLoc:operand.sourceLoc};
+					}
+
+					var val = parseInt(a);
+					r.push( val );
+				}
+				return r;
+
 			}
 		}
 
@@ -372,7 +389,7 @@ makeAssembler : function() {
 				if (plusidx >= 0 && text.indexOf('+', plusidx+1) < 0) {
 
 					if (!operand.is_memory_access) {
-						throw {name:'ParseError', message:'This form is only valid for memory access: [REG+literal]', sourceLog:operand.sourceLoc};
+						throw {name:'ParseError', message:'This form is only valid for memory access: [REG+literal]', sourceLoc:operand.sourceLoc};
 					}
 
 					operand.a = $.trim( text.substring(0, plusidx) );
@@ -813,7 +830,7 @@ displayState : function(puter) {
 	var $table = $('<table class="table table-condensed register-table" />');
 
 	$table.append('<tr><th>Register</th><th>hex</th><th>dec</th><th>bin</th></tr>')
-	$table.append('<tr><td>PC</td><td>0x' + puter.PC.toString(16) + '</td><td>' + puter.PC.toString(16) + '</td><td>' + toBinaryString(puter.PC, 16) + '</td></tr>' );
+	$table.append('<tr><td>PC</td><td>0x' + puter.PC.toString(16) + '</td><td>' + puter.PC.toString(10) + '</td><td>' + toBinaryString(puter.PC, 16) + '</td></tr>' );
 	$table.append('<tr><td>SP</td><td>0x' + puter.SP.toString(16) + '</td><td>' + puter.SP.toString(10) + '</td><td>' + toBinaryString(puter.SP, 16) + '</td></tr>' );
 	$table.append('<tr><td>O</td><td>0x' + puter.O.toString(16) + '</td><td>' + puter.O.toString(10) + '</td><td>' + toBinaryString(puter.O, 16) + '</td></tr>' );
 	for (var i  = 0; i < 8; ++i ) {
