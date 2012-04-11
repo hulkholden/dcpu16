@@ -546,9 +546,11 @@ makePuter : function() {
 		loadCode :  function(code) {
 			this.code = code;	// Keep track of the original code. 
 
-			for (var i = 0; i < code.length; ++i) {
-				this.data[i] = code[i];
-			};
+			if (code) {
+				for (var i = 0; i < code.length; ++i) {
+					this.data[i] = code[i];
+				};
+			}
 			for (var i = 0; i < this.regs.length; ++i) {
 				this.regs[i] = 0;
 			}
@@ -722,28 +724,30 @@ makePuter : function() {
 },
 
 displayDisassembly : function(code, cur_pc) {
-	var dis = this.makeDisassembler(code);
+
 	var $pre = $('<table />');
 
-	$pre.append('<tr><th width=100></th><th></th><th></th></tr>');
+	if (code) {
+		var dis = this.makeDisassembler(code);
+		$pre.append('<tr><th width=100></th><th></th><th></th></tr>');
 
-	while (dis.PC < dis.code.length) {
-		var pc = dis.PC;
-		var d = dis.disasm();
+		while (dis.PC < dis.code.length) {
+			var pc = dis.PC;
+			var d = dis.disasm();
 
-		var ops = '';
-		for (var i = pc; i < dis.PC; ++i) {
-			var op = dis.code[i].toString(16);
-			while(op.length < 4) op = '0' + op;
-			ops +=  op + ' ';
-		}
+			var ops = '';
+			for (var i = pc; i < dis.PC; ++i) {
+				var op = dis.code[i].toString(16);
+				while(op.length < 4) op = '0' + op;
+				ops +=  op + ' ';
+			}
 
-		var $tr = $('<tr><td>0x' + pc.toString(16) + '</td><td>' + ops + '</td><td>' + d + '</td></tr>');
-		if (pc === cur_pc)
-			$tr.attr('bgcolor', '#eeeeee');
-		$pre.append($tr);
+			var $tr = $('<tr><td>0x' + pc.toString(16) + '</td><td>' + ops + '</td><td>' + d + '</td></tr>');
+			if (pc === cur_pc)
+				$tr.attr('bgcolor', '#eeeeee');
+			$pre.append($tr);
+		}	
 	}
-
 
 	$('#disasm').html($pre);
 },
