@@ -608,12 +608,14 @@ makeAssembler : function() {
 
 			var lexer = makeLexer(line, sourceLoc);
 
+			// Ignore blank lines (or lines just containing a comment)
+			lexer.skipWhite();
 			if (lexer.empty())
 				return;
 
 			// Check for a label here
 			var first_char = lexer.peekChar();
-			if (first_char == kColon) {
+			if (first_char === kColon) {
 				lexer.popChar();
 
 				var label = lexer.getLabel();
@@ -623,9 +625,9 @@ makeAssembler : function() {
 				this.labels[label] = this.instructions.length;
 			}
 
-			// Ignore blank lines (or lines just containing a comment)
+			// Bail out if the rest of the line is empty, or only contains a semicolon
 			lexer.skipWhite();
-			if (lexer.empty() || lexer.peekChar() == kSemiColon)
+			if (lexer.empty() || lexer.peekChar() === kSemiColon)
 				return;
 
 			// Check for opcode
