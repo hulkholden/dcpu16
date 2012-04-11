@@ -148,6 +148,9 @@ makeAssembler : function() {
 	var kTab                = "\t".charCodeAt(0);
 	var kLeftSquareBracket  = "[".charCodeAt(0);
 	var kRightSquareBracket = "]".charCodeAt(0);
+	var kHash               = "#".charCodeAt(0);
+	var kLeftCurlyBrace     = "{".charCodeAt(0);
+	var kRightCurlyBrace    = "}".charCodeAt(0);
 
 	function isLabelChar(c) {
 		return (c >= kUpperBoundLo  && c <= kUpperBoundHi) ||
@@ -434,15 +437,61 @@ makeAssembler : function() {
 			}
 
 			this.errorText += err;
-		},	
+		},
+
+		preprocess : function(lines) {
+
+			var pplines = []; 		// array of {sourceLoc, lineText}
+
+			var curLine = 0;
+			while (curLine < lines.length) {
+				var line = lines[curLine];
+				var ppline = {sourceLoc:{line:curLine,col:0}, lineText:line};
+				++curLine;
+
+				if (line.length == 0)
+					continue;
+
+				if (line.charCodeAt(0) == kHash) {
+					// macro
+
+					var macro = [];
+					while (curLine < lines.length) {
+						line = lines[curLine];
+						ppline = {sourceLoc:{line:curLine,col:0}, lineText:line};
+
+						if (line.length > 0 && line.charCodeAt(0) == kRightCurlyBrace) {
+							++curLine;
+							break;
+						}
+
+						macro.push(ppline);
+						++curLine;
+					}
+
+					// store macros somewhere...
+
+				} else {
+					pplines.push(ppline);
+				}
+
+			}
+
+			return pplines;
+		},
 
 		assemble : function(text) {
+
 			var lines = text.split('\n');
-			for (var i = 0; i < lines.length; ++i) {
-				var line = lines[i];
+
+			// preprocess, extract all macros, strip comments etc.
+			var pplines = this.preprocess(lines);
+
+			for (var i = 0; i < pplines.length; ++i) {
+				var ppline = pplines[i];
 
 				try {
-					this.parseLine(line, {line:i,col:0});
+					this.parseLine(ppline.lineText, ppline.sourceLoc);
 				} catch (e) {
 					this.displayParseError(lines, e);
 				}
@@ -467,7 +516,8 @@ makeAssembler : function() {
 				return;
 
 			// Check for a label here
-			if (lexer.peekChar() == kColon) {
+			var first_char = lexer.peekChar();
+			if (first_char == kColon) {
 				lexer.popChar();
 
 				var label = lexer.getLabel();
