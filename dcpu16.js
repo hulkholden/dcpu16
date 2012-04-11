@@ -515,7 +515,7 @@ makeAssembler : function() {
 			}
 
 			try {
-				this.finalise();
+				this.finalise(lines);
 			} catch (e) {
 				this.displayParseError(lines, e);
 			}
@@ -572,15 +572,21 @@ makeAssembler : function() {
 			}
 		},
 
-		finalise : function() {
+		finalise : function(lines) {
 
 			var buf = [];
 			for (var i = 0; i < this.instructions.length; ++i) {
 				var instruction = this.instructions[i];
-				var r = packInstruction(instruction, this.labels);
 
-				instruction.address = buf.length;
-				buf = buf.concat( r );
+				try {
+					var r = packInstruction(instruction, this.labels);
+
+					instruction.address = buf.length;
+					buf = buf.concat( r );
+
+				} catch(e) {
+					this.displayParseError(lines, e);
+				}
 			}
 
 			// second pass to remap label data values
