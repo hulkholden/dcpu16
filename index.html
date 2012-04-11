@@ -100,22 +100,27 @@
     var puter = dcpu.makePuter();
 
     $(document).ready(function(){
+
+      // Load state from localStorage
+      var prev_code = localStorage.getItem('code');
+      if (prev_code) {
+        $('#codearea').val(prev_code);
+      }
+
+      // Perform a live update whenever the codearea text changes
       $('#codearea').keyup(function(){
         liveUpdate();
       });
+
+      // initial live update
+      liveUpdate();
     });
-
-    // Load state from localStorage
-    var prev_code = localStorage.getItem('code');
-    if (prev_code) {
-      $('#codearea').val(prev_code);
-    }
-
-    load();
 
     function liveUpdate() {
       $('#output').html('');
-      load();
+      var t = $('#codearea').val();
+      localStorage.setItem('code', t);
+      reset(dcpu.parseSource(t));
     }
 
     function loadFile() {
@@ -143,12 +148,6 @@
         //reader.readAsArrayBuffer(file);
         reader.readAsText(file);
       }
-    }
-
-    function load() {
-      var t = $('#codearea').val();
-      localStorage.setItem('code', t);
-      reset(dcpu.parseSource(t));
     }
 
     function reset(code) {
