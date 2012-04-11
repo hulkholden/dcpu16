@@ -477,6 +477,11 @@ makeAssembler : function() {
 				this.labels[label] = this.instructions.length;
 			}
 
+			// Ignore blank lines (or lines just containing a comment)
+			lexer.skipWhite();
+			if (lexer.empty() || lexer.peekChar() == kSemiColon)
+				return;
+
 			// Check for opcode
 			var opcode = lexer.getOpCode();
 			if (opcode) {
@@ -495,6 +500,8 @@ makeAssembler : function() {
 						break;
 					lexer.popChar();
 				}
+			} else {
+				throw {name:'ParseError', message:'Expecting a label or opcode', sourceLoc:sourceLoc};
 			}
 		},
 
