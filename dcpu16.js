@@ -129,7 +129,7 @@ makeDisassembler : function(_code) {
 					return 'JSR ' + this.operandName(b, bdat);
 				}
 
-				return 'xxx';
+				return '???';
 			} else if (op < kOpNames.length) {
 
 				var adat = this.PC; if (operandHasData(a)) ++this.PC;
