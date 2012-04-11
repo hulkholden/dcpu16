@@ -29,6 +29,19 @@ function getSimpleOpIdx(opname) {
 	return -1;
 }
 
+function getUnescapedChar(c) {
+	switch(c) {
+		case 'n':	return '\n';
+		case 'r':	return "\r";
+		case 't':	return "\t";
+		case 'v':	return "\v";
+		case '\\':	return "\\";
+		case '\/':	return "/";
+	}
+
+	return -1;
+}
+
 function isNumber(n) {
 	return !isNaN(parseInt(n)) && isFinite(n);
 }
@@ -145,6 +158,8 @@ makeAssembler : function() {
 	var kSemiColon          = ";".charCodeAt(0);
 	var kSpace              = " ".charCodeAt(0);
 	var kTab                = "\t".charCodeAt(0);
+	var kDoubleQuote        = "\"".charCodeAt(0);
+	var kBackslash          = "\\".charCodeAt(0);
 	var kHash               = "#".charCodeAt(0);
 	var kLeftSquareBracket  = "[".charCodeAt(0);
 	var kRightSquareBracket = "]".charCodeAt(0);
@@ -215,12 +230,18 @@ makeAssembler : function() {
 						throw {name:'ParseError', message:'Expecting simple operand', sourceLoc:operand.sourceLoc};
 					}
 					var a = operand.a;
-					if (!isNumber(a)) {
+
+					if (operand.is_string_literal) {
+						for (var c = 0; c < a.length; ++c) {
+							r.push( a.charCodeAt(c) );
+						}
+					} else if (isNumber(a)) {
+						var val = parseInt(a);
+						r.push( val );
+					} else {
 						throw {name:'ParseError', message:'Expecting a literal', sourceLoc:operand.sourceLoc};
 					}
 
-					var val = parseInt(a);
-					r.push( val );
 				}
 				return r;
 
@@ -278,7 +299,9 @@ makeAssembler : function() {
 			} else {
 				var val;
 				var is_label = 0;
-				if (isNumber(a)) {
+				if (operand.is_string_literal) {
+					throw {name:'ParseError', message:"Unexpected string literal", sourceLoc:operand.sourceLoc};
+				} if (isNumber(a)) {
 					val = parseInt(a);
 				} else {
 					if (labels.hasOwnProperty(a)) {
@@ -372,6 +395,39 @@ makeAssembler : function() {
 
 					++i;	// Right bracket
 
+				} else if (line.charCodeAt(i) == kDoubleQuote) {
+					++i;	// quote
+
+					var str = '';
+					var in_escape = 0;
+					var matched_closing_quote = 0;
+					while(i < end) {
+						var char_code = line.charCodeAt(i);
+						var char   = line.charAt(i);
+						if (in_escape) {
+							var unescaped = getUnescapedChar( char );
+							if (unescaped < 0) {
+								throw {name:'ParseError', message:"Unknown escape sequence: '" + char + "'", sourceLoc:{line:operand.sourceLoc.line, col:i, colStart:i, colEnd:i}};
+							}
+							str = str + unescaped;
+							in_escape = 0;
+						} else if (char_code == kDoubleQuote) {
+							++i;
+							matched_closing_quote = 1;
+							break;
+						} else if (char_code == kBackslash) {
+							in_escape = 1;
+						} else {
+							str = str + char;
+						}
+						++i;
+					}
+
+					if (!matched_closing_quote)
+						throw {name:'ParseError', message:"Missing '\"'", sourceLoc:operand.sourceLoc};
+
+					operand.is_string_literal = 1;
+					text = str;
 				} else {
 					var b = i;
 					while(i < end) {
@@ -387,18 +443,23 @@ makeAssembler : function() {
 				// FIXME: this overestimates the end of the second arg: includes whitespace
 				operand.sourceLoc.colEnd = i;
 
-				// Look for an operand of the form REG+Literal or Literal+REG (avoid matchi on '[SP++])
-				var plusidx = text.indexOf('+');
-				if (plusidx >= 0 && text.indexOf('+', plusidx+1) < 0) {
+				if (operand.is_string_literal) {
+					operand.a = text;
+				} else {
+					// Look for an operand of the form REG+Literal or Literal+REG (avoid matchi on '[SP++])
+					var plusidx = text.indexOf('+');
+					if (plusidx >= 0 && text.indexOf('+', plusidx+1) < 0) {
 
-					if (!operand.is_memory_access) {
-						throw {name:'ParseError', message:'This form is only valid for memory access: [REG+literal]', sourceLoc:operand.sourceLoc};
+						if (!operand.is_memory_access) {
+							throw {name:'ParseError', message:'This form is only valid for memory access: [REG+literal]', sourceLoc:operand.sourceLoc};
+						}
+
+						operand.a = $.trim( text.substring(0, plusidx) );
+						operand.b = $.trim( text.substring(plusidx+1) );
+					} else {
+						operand.a = $.trim( text );
 					}
 
-					operand.a = $.trim( text.substring(0, plusidx) );
-					operand.b = $.trim( text.substring(plusidx+1) );
-				} else {
-					operand.a = $.trim( text );
 				}
 
 				return operand;
@@ -443,7 +504,7 @@ makeAssembler : function() {
 						++i;
 						for ( ; i+1 < e.sourceLoc.colEnd; ++i )
 							t += '~';
-						if (i > e.sourceLoc.colStart)
+						if (i > e.sourceLoc.colStart && i < e.sourceLoc.colEnd)
 							t += '^';
 
 						err += indent + t + "\n";
