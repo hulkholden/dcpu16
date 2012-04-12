@@ -214,13 +214,13 @@ makeAssembler : function() {
 				if (instruction.operands.length != 1)
 					throw {name:'ParseError', message:'Expecting 1 operand', sourceLoc:instruction.sourceLoc};
 
-				var opa = instruction.operands[0];
-				var b = packOperand(opa, labels);
+				var operand = instruction.operands[0];
+				var loc = packOperand(operand, labels);
 
-				var a = 0x1;		// JSR
-				r.push( (b<<10) | (a<<4) | 0x00 );
-				if (opa.hasOwnProperty('data'))
-					r.push(opa.data);
+				var subop = 0x1;		// JSR
+				r.push( (loc<<10) | (subop<<4) | 0x00 );
+				if (operand.hasOwnProperty('data'))
+					r.push(operand.data);
 				return r;
 			} else if (opname === 'DAT') {
 
@@ -229,22 +229,38 @@ makeAssembler : function() {
 					if (operand.hasOwnProperty('b')) {
 						throw {name:'ParseError', message:'Expecting simple operand', sourceLoc:operand.sourceLoc};
 					}
-					var a = operand.a;
 
 					if (operand.is_string_literal) {
-						for (var c = 0; c < a.length; ++c) {
-							r.push( a.charCodeAt(c) );
+						for (var c = 0; c < operand.value.length; ++c) {
+							r.push( operand.value.charCodeAt(c) );
 						}
-					} else if (isNumber(a)) {
-						var val = parseInt(a);
-						r.push( val );
+					} else if (operand.is_numeric_literal) {
+						if (operand.value > 0xffff)
+							throw {name:'ParseError', message:'Data value is too large', sourceLoc:operand.sourceLoc};
+
+						r.push( operand.value );
 					} else {
 						throw {name:'ParseError', message:'Expecting a literal', sourceLoc:operand.sourceLoc};
 					}
-
 				}
 				return r;
+			} else if (opname === 'RESERVE') {
+				if (instruction.operands.length != 1)
+					throw {name:'ParseError', message:'Expecting 1 operand', sourceLoc:instruction.sourceLoc};
 
+				var operand = instruction.operands[0];
+
+				if (operand.is_numeric_literal) {
+					var val = operand.value;
+					if (val > 0xffff)
+						throw {name:'ParseError', message:'Argument for RESERVE is too large', sourceLoc:operand.sourceLoc};
+					for (var i = 0; i < val; ++i)
+						r.push( 0 );
+
+					return r;
+				} else {
+					throw {name:'ParseError', message:'Expecting a numeric literal', sourceLoc:operand.sourceLoc};
+				}
 			}
 		}
 
@@ -253,89 +269,100 @@ makeAssembler : function() {
 
 	function packOperand(operand, labels) {
 
-		var a = operand.a;
-
-		if (operand.hasOwnProperty('b')) {
-			var b = operand.b;
-
+		if (operand.is_memory_access) {
+			var a    = operand.value.a;
 			var rega = getRegisterIdx(a);
-			var regb = getRegisterIdx(b);
-			var val;
-			var reg;
-			var is_label = 0;
-			if (rega >= 0 && regb >= 0) {
-				throw {name:'ParseError', message:"No operand which takes two registers", sourceLoc:operand.sourceLoc};
-			} else if (rega >= 0) {
-				reg = rega;
-				if (isNumber(b)) {
-					val = parseInt(b);
-				} else if (labels.hasOwnProperty(b)) {
-					val = b;
-					is_label = 1;
+
+			if (operand.value.hasOwnProperty('b')) {
+				var b    = operand.value.b;
+				var regb = getRegisterIdx(b);
+				var val;
+				var reg;
+				var is_label = 0;
+				if (rega >= 0 && regb >= 0) {
+					throw {name:'ParseError', message:"No operand which takes two registers", sourceLoc:operand.sourceLoc};
+				} else if (rega >= 0) {
+					reg = rega;
+					if (isNumber(b)) {
+						val = parseInt(b);
+					} else if (labels.hasOwnProperty(b)) {
+						val = b;
+						is_label = 1;
+					} else {
+						throw {name:'ParseError', message:"Unknown operand form", sourceLoc:operand.sourceLoc};
+					}
+				} else if (regb >= 0) {
+					reg = regb;
+					if (isNumber(a)) {
+						val = parseInt(a);
+					} else if (labels.hasOwnProperty(a)) {
+						val = a;
+						is_label = 1;
+					} else {
+						throw {name:'ParseError', message:"No operand which takes two literals", sourceLoc:operand.sourceLoc};					
+					}
 				} else {
 					throw {name:'ParseError', message:"Unknown operand form", sourceLoc:operand.sourceLoc};
 				}
-			} else if (regb >= 0) {
-				reg = regb;
-				if (isNumber(a)) {
-					val = parseInt(a);
-				} else if (labels.hasOwnProperty(a)) {
-					val = a;
-					is_label = 1;
+
+				if (is_label || val > 0) {
+					operand.data = val;		// next_word
+					return 0x10 + reg;
 				} else {
-					throw {name:'ParseError', message:"No operand which takes two literals", sourceLoc:operand.sourceLoc};					
+					return 0x08 + reg;
 				}
 			} else {
-				throw {name:'ParseError', message:"Unknown operand form", sourceLoc:operand.sourceLoc};
+				if (rega >= 0) {
+					return 0x08 + rega;
+				} else if (isNumber(a)) {
+					operand.data = parseInt(a);	// next_word
+					return 0x1e;
+				} else if(labels.hasOwnProperty(a)) {
+					operand.data = a;	// next_word
+					return 0x1e;
+				} else {
+					throw {name:'ParseError', message:'Unhandled memory access form', sourceLoc:operand.sourceLoc};
+				}
 			}
 
-			if (is_label || val > 0) {
-				operand.data = val;		// next_word
-				return 0x10 + reg;
-			} else {
-				return 0x08 + reg;
-			}
-		} else {
-			var reg = getRegisterIdx(a);
+		} else if (operand.is_identifier) {
+			var id  = operand.value;
+			var reg = getRegisterIdx(id);
 			if (reg >= 0) {
-				return reg + (operand.is_memory_access ? 0x08 : 0x00);
-			} else if (a === 'POP' || a === 'pop' || a === '[SP++]') {
+				return 0x00 + reg;
+			} else if (id === 'POP' || id === 'pop') {
 				return 0x18;
-			} else if (a === 'PEEK' || a === 'peek' || a === '[SP]') {
+			} else if (id === 'PEEK' || id === 'peek') {
 				return 0x19;
-			} else if (a === 'PUSH' || a === 'push' || a === '[--SP') {
+			} else if (id === 'PUSH' || id === 'push') {
 				return 0x1a;
-			} else if (a === 'SP' || a === 'sp') {
+			} else if (id === 'SP' || id === 'sp') {
 				return 0x1b;
-			} else if (a === 'PC' || a === 'pc') {
+			} else if (id === 'PC' || id === 'pc') {
 				return 0x1c;
-			} else if (a === 'O' || a === 'o') {
+			} else if (id === 'O' || id === 'o') {
 				return 0x1d;
 			} else {
-				var val;
-				var is_label = 0;
-				if (operand.is_string_literal) {
-					throw {name:'ParseError', message:"Unexpected string literal", sourceLoc:operand.sourceLoc};
-				} if (isNumber(a)) {
-					val = parseInt(a);
-				} else if (labels.hasOwnProperty(a)) {
-					is_label = 1;	// remember this is a label - have to avoid small value optimisation
-					val = a;		// address filled in later, set to label string now
-				} else {
-					throw {name:'ParseError', message:"Unknown label '" + a + "'", sourceLoc:operand.sourceLoc};
-				}
-
-
-				if (operand.is_memory_access) {
-					operand.data = val;	// next_word
-					return 0x1e;
-				} else if (is_label || val >= 0x20) {
-					operand.data = val; // next_word
+				if (labels.hasOwnProperty(id)) {
+					// Store the label in .data - we remap these to numeric values later
+					operand.data = id; // next_word
 					return 0x1f;
 				} else {
-					return 0x20 + val;
-				}	
+					throw {name:'ParseError', message:"Unknown label '" + id + "'", sourceLoc:operand.sourceLoc};
+				}
 			}
+		} else if (operand.is_numeric_literal) {
+			var val = operand.value;
+			if (val > 0xffff) {
+				throw {name:'ParseError', message:"Numeric literal is too large", sourceLoc:operand.sourceLoc};
+			} else if (val >= 0x20) {
+				operand.data = val; // next_word
+				return 0x1f;
+			} else {
+				return 0x20 + val;
+			}
+		} else if (operand.is_string_literal) {
+			throw {name:'ParseError', message:"Unexpected string literal", sourceLoc:operand.sourceLoc};
 		}
 
 		throw {name:'ParseError', message:'Unhandled case', sourceLoc:operand.sourceLoc};
@@ -389,10 +416,7 @@ makeAssembler : function() {
 
 				var operand = {};
 
-				operand.is_memory_access = 0;
-				operand.sourceLoc        = {line:sourceLoc.line, col:i, colStart:i, colEnd:i};
-
-				var text = '';
+				operand.sourceLoc = {line:sourceLoc.line, col:i, colStart:i, colEnd:i};
 
 				if (line.charCodeAt(i) == kLeftSquareBracket) {
 
@@ -406,19 +430,34 @@ makeAssembler : function() {
 					if (i >= end)
 						throw {name:'ParseError', message:"Missing ']'", sourceLoc:operand.sourceLoc};
 
-					text = line.substr(b, i-b);
+					var text = line.substr(b, i-b);
+
+					operand.value = {};
+
+					// Look for an operand of the form REG+Literal or Literal+REG (avoid matchi on '[SP++])
+					var plusidx = text.indexOf('+');
+					if (plusidx >= 0 && text.indexOf('+', plusidx+1) < 0) {
+						operand.value.a = $.trim( text.substring(0, plusidx) );
+						operand.value.b = $.trim( text.substring(plusidx+1) );
+					} else {
+						operand.value.a = $.trim( text );
+					}
 
 					++i;	// Right bracket
 
-				} else if (line.charCodeAt(i) == kDoubleQuote) {
-					++i;	// quote
+					// FIXME: if this is [SP++], [SP], [--SP] need switch for 'PUSH', 'PEEK' etc
 
+				} else if (line.charCodeAt(i) == kDoubleQuote) {
+
+					operand.is_string_literal = 1;
+
+					++i;	// quote
 					var str = '';
 					var in_escape = 0;
 					var matched_closing_quote = 0;
 					while(i < end) {
 						var char_code = line.charCodeAt(i);
-						var char   = line.charAt(i);
+						var char      = line.charAt(i);
 						if (in_escape) {
 							var unescaped = getUnescapedChar( char );
 							if (unescaped < 0) {
@@ -441,8 +480,7 @@ makeAssembler : function() {
 					if (!matched_closing_quote)
 						throw {name:'ParseError', message:"Missing '\"'", sourceLoc:operand.sourceLoc};
 
-					operand.is_string_literal = 1;
-					text = str;
+					operand.value = str;
 				} else {
 					var b = i;
 					while(i < end) {
@@ -451,31 +489,22 @@ makeAssembler : function() {
 							break;
 						++i;
 					}
-					text = line.substr(b, i-b);
+
+					var text = line.substr(b, i-b);
+					text = $.trim(text);
+
+					if (isNumber(text)) {
+						operand.is_numeric_literal = 1;
+						operand.value = parseInt(text);
+					} else {
+						operand.is_identifier = 1;
+						operand.value = text;
+					}
 				}
 
 				// update the sourceLoc to reflect end
 				// FIXME: this overestimates the end of the second arg: includes whitespace
 				operand.sourceLoc.colEnd = i;
-
-				if (operand.is_string_literal) {
-					operand.a = text;
-				} else {
-					// Look for an operand of the form REG+Literal or Literal+REG (avoid matchi on '[SP++])
-					var plusidx = text.indexOf('+');
-					if (plusidx >= 0 && text.indexOf('+', plusidx+1) < 0) {
-
-						if (!operand.is_memory_access) {
-							throw {name:'ParseError', message:'This form is only valid for memory access: [REG+literal]', sourceLoc:operand.sourceLoc};
-						}
-
-						operand.a = $.trim( text.substring(0, plusidx) );
-						operand.b = $.trim( text.substring(plusidx+1) );
-					} else {
-						operand.a = $.trim( text );
-					}
-
-				}
 
 				return operand;
 			},
