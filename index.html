@@ -11,6 +11,8 @@
     <title>DCPU-16 Emulator</title>
   </head>
   <body>
+    <img src="font.png" style="display: none" id="font" />
+
     <div class="container" id="container">
       <div class="row">
         <div class="span12">
@@ -73,6 +75,9 @@
                   <button class="btn" onclick="loadSample()">Load Sample</button>&nbsp;
             </fieldset>
           </form>
+
+          <canvas id="display" width="512" height="384"></canvas>
+
         </div>
       </div>
 
@@ -111,6 +116,8 @@
     var puter = dcpu.makePuter();
 
     $(document).ready(function(){
+
+      dcpu.loadFontData(puter);
 
       // Load state from localStorage
       var prev_code = localStorage.getItem('code');
@@ -169,8 +176,10 @@
     }
 
     function run() {
-      puter.run(10000);
+      puter.run(1000);
       refreshDisplay();
+
+      setTimeout("run()", 16);
     }
 
     function refreshDisplay() {
