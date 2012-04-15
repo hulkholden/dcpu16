@@ -767,9 +767,14 @@ makePuter : function() {
             this.code = code;   // Keep track of the original code. 
 
             if (code) {
-                for (var i = 0; i < code.length; ++i) {
+                var i = 0;
+                for (; i < code.length; ++i) {
                     this.data[i] = code[i];
-                };
+                }
+                for (; i < this.data.length; ++i) {
+                    this.data[i] = 0;
+                }
+
             }
             for (var i = 0; i < this.regs.length; ++i) {
                 this.regs[i] = 0;
@@ -1118,10 +1123,6 @@ displayState : function(puter) {
             }
 
         }
-
-        //screen_ctx.putImageData(img_data, 0, 0);
-
-
     }
 
 },

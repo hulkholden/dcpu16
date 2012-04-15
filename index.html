@@ -23,11 +23,21 @@
 
       <div class="row">
         <div class="span8">
+          <button class="btn" onclick="load()">Load</button>
+          <input style="visibility:hidden;" id="fileInput" name="fileInput" type="file" onchange="loadFile()" />
+        </div>
+        <div class="span4">
+          <button class="btn" onclick="step()">Step</button>&nbsp;
+          <button class="btn" id="runbutton" onclick="toggleRun()">Run</button>&nbsp;
+        </div>
+      </div>      
+
+      <div class="row">
+        <div class="span8">
 
           <form action='javascript:false'>
             <fieldset>
               <div class="control-group">
-                <label class="control-label" for="codearea">Code</label>
                 <div class="controls">
                   <textarea class="input-xxlarge" id="sample_codearea" style="display: none">
 ; Try some basic stuff
@@ -68,16 +78,7 @@
 
         </div>
         <div class="span4">
-          <form onsubmit="return false" id="loadform">
-            <fieldset>
-                  <label class="control-label">Load .dasm file:</label>
-                  <input class="input-file" id="fileInput" name="fileInput" type="file" onchange="loadFile()" />
-                  <button class="btn" onclick="loadSample()">Load Sample</button>&nbsp;
-            </fieldset>
-          </form>
-
           <canvas id="display" width="512" height="384"></canvas>
-
         </div>
       </div>
 
@@ -88,20 +89,10 @@
       </div>
 
       <div class="row">
-
-        <div class="span12">
-          <div>
-            <button class="btn" onclick="step()">Step</button>&nbsp;
-            <button class="btn" id="runbutton" onclick="toggleRun()">Run</button>&nbsp;
-          </div>
-        </div>
-      </div>
-
-      <div class="row">
-        <div class="span7">
+        <div class="span8">
           <div id="disasm"></div>
         </div>
-        <div class="span5">
+        <div class="span4">
           <div id="registers"></div>
         </div>
       </div>
@@ -117,8 +108,6 @@
     var puter_running = 0;
 
     $(document).ready(function(){
-
-      dcpu.loadFontData(puter);
 
       // Load state from localStorage
       var prev_code = localStorage.getItem('code');
@@ -145,7 +134,12 @@
       // reload program state
       var code = dcpu.parseSource(source);
       puter.loadCode(code);
+      dcpu.loadFontData(puter);
       refreshDisplay();
+    }
+
+    function load() {
+      $('#fileInput').click();
     }
 
     function loadFile() {
