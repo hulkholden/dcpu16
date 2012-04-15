@@ -418,9 +418,8 @@ makeAssembler : function() {
 
                 operand.sourceLoc = {line:sourceLoc.line, col:i, colStart:i, colEnd:i};
 
-                if (line.charCodeAt(i) == kLeftSquareBracket) {
 
-                    operand.is_memory_access = 1;
+                if (line.charCodeAt(i) == kLeftSquareBracket) {
 
                     ++i;    // Left bracket
                     var b = i;
@@ -431,21 +430,31 @@ makeAssembler : function() {
                         throw {name:'ParseError', message:"Missing ']'", sourceLoc:operand.sourceLoc};
 
                     var text = line.substr(b, i-b);
-
-                    operand.value = {};
-
-                    // Look for an operand of the form REG+Literal or Literal+REG (avoid matchi on '[SP++])
-                    var plusidx = text.indexOf('+');
-                    if (plusidx >= 0 && text.indexOf('+', plusidx+1) < 0) {
-                        operand.value.a = $.trim( text.substring(0, plusidx) );
-                        operand.value.b = $.trim( text.substring(plusidx+1) );
-                    } else {
-                        operand.value.a = $.trim( text );
-                    }
-
                     ++i;    // Right bracket
 
-                    // FIXME: if this is [SP++], [SP], [--SP] need switch for 'PUSH', 'PEEK' etc
+                    // FIXME: should parse this rather than dumb string compare - look for tokens and ignore whitespace.
+                    var text_upper = text.toUpperCase();
+                    if (text_upper === 'SP++') {
+                        operand.is_identifier = 1;
+                        operand.value = 'POP';
+                    } else if (text_upper === 'SP') {
+                        operand.is_identifier = 1;
+                        operand.value = 'PEEK';
+                    } else if (text_upper === '--SP') {
+                        operand.is_identifier = 1;
+                        operand.value = 'PUSH';
+                    } else {
+                        operand.is_memory_access = 1;
+                        operand.value = {};
+
+                        var plusidx = text.indexOf('+');
+                        if (plusidx >= 0) {
+                            operand.value.a = $.trim( text.substring(0, plusidx) );
+                            operand.value.b = $.trim( text.substring(plusidx+1) );
+                        } else {
+                            operand.value.a = $.trim( text );
+                        }
+                    }
 
                 } else if (line.charCodeAt(i) == kDoubleQuote) {
 
