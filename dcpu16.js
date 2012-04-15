@@ -7,6 +7,8 @@ var kOpNames = [
     'SHR', 'AND', 'BOR', 'XOR', 'IFE', 'IFN', 'IFG', 'IFB',
 ];
 
+var kNumScreenChars = 32*12;
+
 function getRegisterIdx(regname) {
     regname = regname.toUpperCase();
 
@@ -758,6 +760,9 @@ makePuter : function() {
         O : 0,
         CondExec : 1,
 
+        // lastScreen keeps track of the last character we rendered, to allow faster screen updates
+        lastScreen : new Uint16Array(kNumScreenChars),
+
         loadCode :  function(code) {
             this.code = code;   // Keep track of the original code. 
 
@@ -774,6 +779,10 @@ makePuter : function() {
             this.SP = 0;
             this.O = 0;
             this.CondExec = 1;
+
+            // Set to an invalid value, so that we force a redraw
+            for (var i = 0; i < kNumScreenChars; ++i)
+                this.lastScreen[i] = -1;
         },
 
         jsr : function(addr) {
@@ -1036,13 +1045,6 @@ displayState : function(puter) {
     }
 
     $('#registers').html($table);
-
-    var kNumScreenChars = 32*12;
-    if (!puter.lastScreen) {
-        puter.lastScreen = new Uint16Array(kNumScreenChars);
-        for (var i = 0; i < kNumScreenChars; ++i)
-            puter.lastScreen[i] = -1;
-    }
 
     // http://0x10cwiki.com/wiki/Video_RAM
     var colours = [
