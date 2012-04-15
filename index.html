@@ -92,7 +92,7 @@
         <div class="span12">
           <div>
             <button class="btn" onclick="step()">Step</button>&nbsp;
-            <button class="btn" onclick="run()">Run</button>&nbsp;
+            <button class="btn" id="runbutton" onclick="toggleRun()">Run</button>&nbsp;
           </div>
         </div>
       </div>
@@ -114,6 +114,7 @@
 
     var dcpu = DCPU16();
     var puter = dcpu.makePuter();
+    var puter_running = 0;
 
     $(document).ready(function(){
 
@@ -132,6 +133,7 @@
 
       // initial live update
       liveUpdate();
+      updateLoop();
     });
 
     function liveUpdate() {
@@ -175,11 +177,17 @@
       refreshDisplay();
     }
 
-    function run() {
-      puter.run(1000);
-      refreshDisplay();
+    function toggleRun() {
+      puter_running = !puter_running;
+      $('#runbutton').text(puter_running ? 'Stop' : 'Run');
+    }
 
-      setTimeout("run()", 16);
+    function updateLoop() {
+      if (puter_running) {
+        puter.run(5000);
+        refreshDisplay();
+      }
+      setTimeout("updateLoop()", 16);
     }
 
     function refreshDisplay() {
