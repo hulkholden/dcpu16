@@ -175,7 +175,7 @@
 
     function toggleRun() {
       puter_running = !puter_running;
-      $('#runbutton').text(puter_running ? 'Stop' : 'Run');
+      $('#runbutton').html(puter_running ? '<i class="icon-pause"></i> Pause' : '<i class="icon-play"></i> Run');
     }
 
     function updateLoop() {
