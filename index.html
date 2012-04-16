@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
 
-    <link rel="stylesheet" href="bootstrap.min.css">
+    <link rel="stylesheet" href="css/bootstrap.min.css">
  <style type="text/css">
    .register-table th, .register-table td { text-align: right }
  </style>
@@ -27,8 +27,10 @@
           <input style="visibility:hidden;" id="fileInput" name="fileInput" type="file" onchange="loadFile()" />
         </div>
         <div class="span4">
-          <button class="btn" onclick="step()">Step</button>&nbsp;
-          <button class="btn" id="runbutton" onclick="toggleRun()">Run</button>&nbsp;
+          <div class="btn-group">
+            <button class="btn" onclick="step()">Step</button>&nbsp;
+            <button class="btn" id="runbutton" onclick="toggleRun()"><i class="icon-play"></i> Run</button>&nbsp;
+          </div>
         </div>
       </div>      
 
