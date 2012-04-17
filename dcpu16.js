@@ -7,6 +7,10 @@ var kOpNames = [
     'SHR', 'AND', 'BOR', 'XOR', 'IFE', 'IFN', 'IFG', 'IFB',
 ];
 
+
+var kBasicOpCodeCosts = [ 0, 1, 2, 2, 2, 3, 3, 2, 2, 1, 1, 1, 2, 2, 2, 2, ];
+var kNonBasicOpCodeCosts = [ 0, 2, ];
+
 var kNumScreenChars = 32*12;
 
 function getRegisterIdx(regname) {
@@ -79,6 +83,34 @@ function toBinaryString(v, bits) {
     return t;
 }
 
+
+function decimalToHex(d, padding) {
+    var hex = Number(d).toString(16);
+    padding = typeof (padding) === "undefined" || padding === null ? padding = 2 : padding;
+
+    while (hex.length < padding) {
+        hex = "0" + hex;
+    }
+
+    return hex;
+}
+
+function packRGB(col) {
+    var r = Math.ceil( col.r );
+    var g = Math.ceil( col.g );
+    var b = Math.ceil( col.b );
+
+    return '#' + decimalToHex(r,2) + decimalToHex(g,2) + decimalToHex(b,2);
+}
+
+function lerp(r1,g1,b1, r2,g2,b2, a) {
+    return {
+        r: r1 + a * (r2-r1),
+        g: g1 + a * (g2-g1),
+        b: b1 + a * (b2-b1),
+    };
+}
+
 function printIt(s) {
     $("#output").append("<div>" + s + "</div>");
 }
@@ -125,22 +157,28 @@ makeDisassembler : function(_code) {
             var a  = (opcode&0x03f0)>>4;
             var b  = (opcode&0xfc00)>>10;
 
-            if (op == 0) {
-                if (a == 0x1) {
-                    var bdat = this.PC; if (operandHasData(b)) ++this.PC;
-                    return 'JSR ' + this.operandName(b, bdat);
-                }
+            var result = {text:'???', cost:0};
 
-                return '???';
+            if (op == 0) {
+
+                if (a < kNonBasicOpCodeCosts.length) 
+                    result.cost += kNonBasicOpCodeCosts[a];
+
+                if (a == 0x1) {
+                    var bdat = this.PC; if (operandHasData(b)) { ++this.PC; ++result.cost; }
+                    result.text = 'JSR ' + this.operandName(b, bdat);
+                }
             } else if (op < kOpNames.length) {
 
-                var adat = this.PC; if (operandHasData(a)) ++this.PC;
-                var bdat = this.PC; if (operandHasData(b)) ++this.PC;
+                result.cost += kBasicOpCodeCosts[op];
 
-                return kOpNames[op] + ' ' + this.operandName(a, adat) + ', ' + this.operandName(b, bdat);
+                var adat = this.PC; if (operandHasData(a)) { ++this.PC; ++result.cost; }
+                var bdat = this.PC; if (operandHasData(b)) { ++this.PC; ++result.cost; }
+
+                result.text = kOpNames[op] + ' ' + this.operandName(a, adat) + ', ' + this.operandName(b, bdat);
             }
 
-            return '???';
+            return result;
         }
     };
 
@@ -752,12 +790,13 @@ makeAssembler : function() {
 makePuter : function() {
 
     var puter = {
-        code : null,
-        data : new Uint16Array(0x10000),
-        regs : new Uint16Array(8),      // A B C X Y Z I J
-        PC : 0,
-        SP : 0,
-        O : 0,
+        code     : null,
+        data     : new Uint16Array(0x10000),
+        hitCount : new Uint16Array(0x10000),      // total times this op has been executed
+        regs     : new Uint16Array(8),      // A B C X Y Z I J
+        PC       : 0,
+        SP       : 0,
+        O        : 0,
         CondExec : 1,
 
         // lastScreen keeps track of the last character we rendered, to allow faster screen updates
@@ -774,7 +813,9 @@ makePuter : function() {
                 for (; i < this.data.length; ++i) {
                     this.data[i] = 0;
                 }
-
+            }
+            for (var i = 0; i < this.hitCount.length; ++i) {
+                this.hitCount[i] = 0;
             }
             for (var i = 0; i < this.regs.length; ++i) {
                 this.regs[i] = 0;
@@ -861,6 +902,8 @@ makePuter : function() {
 
             for( var count = 0; count < cycle_count; ++count ) {
                 var orig_sp = this.SP;
+
+                this.hitCount[this.PC]++;   // NB: to handle self-modifying code we should add cycle cost here. We just do a mulitply when displaying though.
 
                 var opcode = this.data[this.PC++];
                 var op = (opcode&0x000f);
@@ -954,26 +997,53 @@ makePuter : function() {
 
 displayDisassembly : function(code, cur_pc) {
 
-    var $pre = $('<table />');
+    var $pre = $('<table class="disasm-table" />');
 
     if (code) {
-        var dis = this.makeDisassembler(code);
-        $pre.append('<tr><th width=100></th><th></th><th></th></tr>');
 
+        var dis = this.makeDisassembler(code);
+
+        // Figure out the max hit count
+        var disassembly = [];       // array of pc:, disasm:, hitCount:
+        var max_total_cost = 0;
         while (dis.PC < dis.code.length) {
-            var pc = dis.PC;
-            var d = dis.disasm();
+            var e = {};
+            e.pc        = dis.PC;
+            e.disasm    = dis.disasm();
+            e.epc       = dis.PC;
+            e.totalCost = puter.hitCount[e.pc] * e.disasm.cost;
+
+            max_total_cost = Math.max(max_total_cost, e.totalCost);
+
+            disassembly.push(e);
+        }
+
+        var profile = '<th>Cost</th><th width=60>Hits</th>';
+        $pre.append('<tr><th width=40>PC</th>' + profile + '<th class="op">Ops</th><th class="op">Bytes</th></tr>');
+
+        for (var e = 0; e < disassembly.length; ++e) {
+            var pc        = disassembly[e].pc;
+            var text      = disassembly[e].disasm.text;
+            var cost      = disassembly[e].disasm.cost;
+            var epc       = disassembly[e].epc;
+            var totalCost = disassembly[e].totalCost;
+
+            var hotness = max_total_cost ? totalCost / max_total_cost : 0;
+            var col     = lerp(255,255,255,  255,128,128, hotness);
+            var colstr  = packRGB(col);
 
             var ops = '';
-            for (var i = pc; i < dis.PC; ++i) {
+            for (var i = pc; i < epc; ++i) {
                 var op = dis.code[i].toString(16);
                 while(op.length < 4) op = '0' + op;
                 ops +=  op + ' ';
             }
 
-            var $tr = $('<tr><td>0x' + pc.toString(16) + '</td><td>' + ops + '</td><td>' + d + '</td></tr>');
+            var profile_text = '<td>' + cost + '</td><td>' + totalCost + '</td>';
+            var $tr = $('<tr><td>0x' + pc.toString(16) + '</td>' + profile_text + '<td class="op">' + text + '</td><td class="op">' + ops + '</td></tr>');
             if (pc === cur_pc)
-                $tr.attr('bgcolor', '#eeeeee');
+                $tr.attr('bgcolor', '#eeee00');
+            else $tr.attr('bgcolor', colstr);
             $pre.append($tr);
         }   
     }
