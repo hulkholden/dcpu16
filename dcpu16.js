@@ -792,12 +792,14 @@ makePuter : function() {
     var puter = {
         code     : null,
         data     : new Uint16Array(0x10000),
-        hitCount : new Uint16Array(0x10000),      // total times this op has been executed
-        regs     : new Uint16Array(8),      // A B C X Y Z I J
+        hitCount : new Uint16Array(0x10000),    // total times this op has been executed
+        regs     : new Uint16Array(8),          // A B C X Y Z I J
         PC       : 0,
         SP       : 0,
         O        : 0,
         CondExec : 1,
+
+        haveFont : false,                       // set when font is updloaded
 
         // lastScreen keeps track of the last character we rendered, to allow faster screen updates
         lastScreen : new Uint16Array(kNumScreenChars),
@@ -821,14 +823,23 @@ makePuter : function() {
                 this.regs[i] = 0;
             }
 
-            this.PC = 0;
-            this.SP = 0;
-            this.O = 0;
+            this.PC       = 0;
+            this.SP       = 0;
+            this.O        = 0;
             this.CondExec = 1;
+
+            this.haveFont = false;
 
             // Set to an invalid value, so that we force a redraw
             for (var i = 0; i < kNumScreenChars; ++i)
                 this.lastScreen[i] = -1;
+        },
+
+        loadFont : function(font) {
+            for (var i = 0; i < font.length; ++i) {
+                this.data[0x8180 + i] = font[i];
+            }
+            this.haveFont = true;
         },
 
         jsr : function(addr) {
@@ -1051,8 +1062,13 @@ displayDisassembly : function(code, cur_pc) {
     $('#disasm').html($pre);
 },
 
-loadFontData : function(puter) {
-    var fnt = $('#font')[0];
+fontData : null,
+
+
+extractFontData : function($font) {
+    var fnt = $font[0];
+
+    this.fontData = new Uint16Array(128*2);
 
     var $canvas = $( '<canvas />', {width:fnt.width, height:fnt.height} );
     if ($canvas[0].getContext){
@@ -1067,7 +1083,7 @@ loadFontData : function(puter) {
         var pixel_stride = 4;
         var row_stride = img_data.width*pixel_stride;
 
-        for (var glyph = 0; glyph < 32*4; ++glyph)
+        for (var glyph = 0; glyph < 128; ++glyph)
         {
             var col = glyph % 32;
             var row = Math.floor(glyph / 32);
@@ -1101,8 +1117,8 @@ loadFontData : function(puter) {
             var ab = (columns[0]<<8) | columns[1];
             var cd = (columns[2]<<8) | columns[3];
 
-            puter.data[0x8180 + glyph*2 + 0] = ab;
-            puter.data[0x8180 + glyph*2 + 1] = cd;
+            this.fontData[glyph*2 + 0] = ab;
+            this.fontData[glyph*2 + 1] = cd;
         }
     }
 },

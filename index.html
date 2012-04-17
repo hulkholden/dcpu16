@@ -13,8 +13,6 @@
     <title>DCPU-16 Emulator</title>
   </head>
   <body>
-    <img src="font.png" style="display: none" id="font" />
-
     <div class="container" id="container">
       <div class="row">
         <div class="span12">
@@ -124,21 +122,35 @@
         liveUpdate();
       });
 
-      // initial live update
+      var $font = $('<img />');
+      $font.attr('src', 'font.png').load(function() {
+        dcpu.extractFontData($font);
+
+        // upload the font as soon as it's available
+        if (dcpu.fontData) {
+          puter.loadFont(dcpu.fontData);
+        }
+      });
+
       liveUpdate();
       updateLoop();
     });
 
     function liveUpdate() {
       var source = $('#codearea').val();
+      localStorage.setItem('code', source);
 
       $('#output').html('');
-      localStorage.setItem('code', source);
       
       // reload program state
       var code = dcpu.parseSource(source);
       puter.loadCode(code);
-      dcpu.loadFontData(puter);
+
+      // if font data is available, upload it
+      if (dcpu.fontData) {
+        puter.loadFont(dcpu.fontData);
+      }
+
       refreshDisplay();
     }
 
@@ -171,8 +183,10 @@
     }
 
     function step() {
-      puter.run(1);
-      refreshDisplay();
+      if (!puter_running && puter.haveFont) {
+        puter.run(1);
+        refreshDisplay();
+      }
     }
 
     function toggleRun() {
@@ -181,7 +195,7 @@
     }
 
     function updateLoop() {
-      if (puter_running) {
+      if (puter_running && puter.haveFont) {
         puter.run(5000);
         refreshDisplay();
       }
@@ -191,11 +205,6 @@
     function refreshDisplay() {
       dcpu.displayDisassembly(puter.code, puter.PC);
       dcpu.displayState(puter);      
-    }
-
-    function loadSample() {
-        $('#codearea').val($('#sample_codearea').val());
-        liveUpdate();
     }
 
     </script>
