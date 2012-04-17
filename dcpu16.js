@@ -803,6 +803,7 @@ makePuter : function() {
 
         // lastScreen keeps track of the last character we rendered, to allow faster screen updates
         lastScreen : new Uint16Array(kNumScreenChars),
+        lastBorder : -1,
 
         loadCode :  function(code) {
             this.code = code;   // Keep track of the original code. 
@@ -833,6 +834,7 @@ makePuter : function() {
             // Set to an invalid value, so that we force a redraw
             for (var i = 0; i < kNumScreenChars; ++i)
                 this.lastScreen[i] = -1;
+            this.lastBorder = -1;
         },
 
         loadFont : function(font) {
@@ -1162,7 +1164,22 @@ displayState : function(puter) {
     if (canvas.getContext) {
         var screen_ctx = canvas.getContext('2d');
 
-        var scale = 4;
+        var scale       = 4;
+        var border_size = 20;
+        var border_col  = puter.data[0x8280] & 0xf;
+
+        if (border_col != puter.lastBorder) {
+            puter.lastBorder = border_col;
+
+            var w = (128*scale) + border_size*2;
+            var h = ( 96*scale) + border_size*2;
+
+            screen_ctx.fillStyle = colours[border_col];
+            screen_ctx.fillRect(0,             0,             border_size, h);
+            screen_ctx.fillRect(0,             0,             w,           border_size);
+            screen_ctx.fillRect(w-border_size, 0,             border_size, h);
+            screen_ctx.fillRect(0,             h-border_size, w,           border_size);
+        }
 
         for(var chidx = 0; chidx < kNumScreenChars; ++chidx) {
             var column = chidx % 32;
@@ -1190,8 +1207,8 @@ displayState : function(puter) {
                          (glyph_cd>>8)&0xff,
                          (glyph_cd   )&0xff ];
 
-            var display_x = (column*4) * scale;
-            var display_y = (row*8)    * scale;
+            var display_x = (column*4) * scale + border_size;
+            var display_y = (row*8)    * scale + border_size;
 
             screen_ctx.fillStyle = colours[bg];
             screen_ctx.fillRect(display_x, display_y, 4*scale, 8*scale);
