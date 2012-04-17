@@ -5,7 +5,9 @@
 
     <link rel="stylesheet" href="css/bootstrap.min.css">
  <style type="text/css">
-   .register-table th, .register-table td { text-align: right }
+   body { padding-top: 30px; }
+   .register-table { width: 450px; }
+   .register-table th, .register-table td { text-align: right; }
    .disasm-table th, .disasm-table td { text-align: right; padding: 2px 10px; }
    .disasm-table th.op, .disasm-table td.op { text-align: left; }
  </style>
@@ -13,17 +15,27 @@
     <title>DCPU-16 Emulator</title>
   </head>
   <body>
-    <div class="container" id="container">
+    <div class="container">
       <div class="row">
         <div class="span12">
           <h1>DCPU-16 Emulator for <a href="http://0x10c.com/">0x10c</a></h1>
-          <p>Yet another Javascript <a href="http://0x10c.com/doc/dcpu-16.txt">DCPU-16</a> assembler/disassembler/emulator. Enter/edit code below, assembled code live updates. Use step and Run to execute the code. Code <a href="https://github.com/hulkholden/dcpu16">here</a>.
+          <p>Yet another Javascript <a href="http://0x10c.com/doc/dcpu-16.txt">DCPU-16</a> assembler/disassembler/emulator/profiler. Code <a href="https://github.com/hulkholden/dcpu16">here</a>, by <a href="https://twitter.com/#!/hulkholden">@HulkHolden</a>.</p>
+
+          <div id="help" style="display:none"><p>Enter/edit code below. It's assembled as you type, and errors are shown immediately below the source window. If the source compiles ok, use step and Run to execute the code. You can use the Debug tab to see the compiled code and register state. The code is profiled as it runs - hot instructions appear in the disassembly with a red background. Cycle costs are approximately correct - there is an additional cost for IFE/IFN/IFG/IFB when the test fails, which I don't account for.</p><p>Stuff that doesn't work yet:<ul>
+            <li>macros (they should be parsed ok, but you can't invoke them)</li>
+            <li>push(i), pop(i) pseudo-ops (or macros?)</li>
+            <li>Some code does 'IFE a, b FOO a,b' all on one line, where 'FOO' is the conditially executed instruction. I don't support this yet.
+            <li>I don't handle keyboard input yet (lame, I know!)</li>
+            <li>I think there's some emulation bugs to do with the display+font</li>
+          </ul>
+          </div>
         </div>
       </div>
 
       <div class="row">
         <div class="span8">
           <button class="btn" onclick="load()"><i class="icon-file"></i> Load</button>
+          <button class="btn" onclick="$('#help').toggle()"><i class="icon-info-sign"></i> Help</button>
           <input style="visibility:hidden;" id="fileInput" name="fileInput" type="file" onchange="loadFile()" />
         </div>
         <div class="span4">
@@ -37,11 +49,20 @@
       <div class="row">
         <div class="span8">
 
-          <form action='javascript:false'>
-            <fieldset>
-              <div class="control-group">
-                <div class="controls">
-                  <textarea class="input-xxlarge" id="sample_codearea" style="display: none">
+
+          <div class="tabbable">
+            <ul class="nav nav-tabs">
+              <li class="active"><a href="#1" data-toggle="tab">Source</a></li>
+              <li><a href="#2" data-toggle="tab">Debug</a></li>
+            </ul>
+            <div class="tab-content">
+              <div class="tab-pane active" id="1">
+
+                <form action='javascript:false'>
+                  <fieldset>
+                    <div class="control-group">
+                      <div class="controls">
+                        <textarea class="input-xxlarge" id="sample_codearea" style="display: none">
 ; Try some basic stuff
             SET A, 0x30              ; 7c01 0030
             SET [0x1000], 0x20       ; 7de1 1000 0020
@@ -70,13 +91,20 @@
 
 ; [*]: Note that these can be one word shorter and one cycle faster by using the short form (0x00-0x1f) of literals,
 ;      but my assembler doesn't support short form labels yet.
-                  </textarea>
-                  <textarea class="input-xxlarge" id="codearea" rows=20>
-                  </textarea>   
-                </div>
+                        </textarea>
+                        <textarea class="input-xxlarge" id="codearea" rows=20>
+                        </textarea>   
+                      </div>
+                    </div>
+                  </fieldset>
+                </form>
               </div>
-            </fieldset>
-          </form>
+              <div class="tab-pane" id="2">
+                <div id="registers"></div>
+                <div id="disasm"></div>
+              </div>
+            </div>
+          </div>
 
         </div>
         <div class="span4">
@@ -86,22 +114,14 @@
       </div>
 
       <div class="row">
-        <div class="span12">
+        <div class="span8">
           <div id="output"></div>
         </div>
       </div>
 
-      <div class="row">
-        <div class="span8">
-          <div id="disasm"></div>
-        </div>
-        <div class="span4">
-          <div id="registers"></div>
-        </div>
-      </div>
-
     </div>
-    <script src="jquery-1.6.4.min.js"></script>
+    <script src="js/jquery.min.js"></script>
+    <script src="js/bootstrap.min.js"></script>
     <script src="dcpu16.js"></script>
 
     <script>
@@ -111,7 +131,6 @@
     var puter_running = 0;
 
     $(document).ready(function(){
-
       // Load state from localStorage
       var prev_code = localStorage.getItem('code');
       if (prev_code) {
