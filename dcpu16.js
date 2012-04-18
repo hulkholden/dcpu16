@@ -1062,6 +1062,11 @@ makePuter : function() {
     return puter;
 },
 
+refreshDebug : function(puter) {
+    this.displayDisassembly(puter.code, puter.PC);
+    this.displayState(puter);
+},
+
 displayDisassembly : function(code, cur_pc) {
 
     var $pre = $('<table class="disasm-table" />');

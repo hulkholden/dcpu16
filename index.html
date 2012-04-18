@@ -238,7 +238,8 @@
         puter.loadFont(dcpu.fontData);
       }
 
-      refreshDisplay(true);
+      dcpu.refreshDebug(puter);
+      dcpu.refreshDisplay(puter);
     }
 
     function load() {
@@ -272,7 +273,8 @@
     function step() {
       if (!puter_running && puter.haveFont) {
         puter.run(1);
-        refreshDisplay(true);
+        dcpu.refreshDebug(puter);
+        dcpu.refreshDisplay(puter);
       }
     }
 
@@ -288,6 +290,9 @@
       lastWallTime = new Date().getTime();
       puter_running = !puter_running;
       $('#runbutton').html(puter_running ? '<i class="icon-pause"></i> Pause' : '<i class="icon-play"></i> Run');
+
+      // Force a refresh, in case e switch to debug tab after stopping.
+      dcpu.refreshDebug(puter);
     }
 
     function updateLoop() {
@@ -312,19 +317,12 @@
         lastWallTime = cur_wall_time;
         //$('#output').html('cpu :' + (cur_cpu_clock - last_cpu_clock) + ', wall: ' + elapsed_wall_time + ', desired: ' + desired_delay + '<br>');
 
-        refreshDisplay(false);
+        // Only update the debug screen if the tab is active - it's too expensive right now.
+        if (isDebugTabActive()) {
+          dcpu.refreshDebug(puter);
+        }
       }
       setTimeout(updateLoop, desired_delay);
-    }
-
-    function refreshDisplay(refresh_screen) {
-      if (isDebugTabActive()) {
-        dcpu.displayDisassembly(puter.code, puter.PC);
-        dcpu.displayState(puter);
-      }
-      if (refresh_screen) {
-        dcpu.refreshDisplay(puter);
-      }
     }
 
     </script>
