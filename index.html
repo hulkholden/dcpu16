@@ -169,21 +169,27 @@
       var kF10   = 121;
       var kF8    = 119;
 
+      var keydownKeys = [kUp, kDown, kLeft, kRight, kF8, kF10];
+
+      // Ugh - need to use keydown for arrows etc, keypress for 'text'
       $('body').keydown(function(event) {
-        if (event.which === kEnter) {
-          event.preventDefault();
-        } else if (event.which === kF10) {
+        if (event.which === kF10) {
           step();
         } else if (event.which === kF8) {
           toggleRun();
         } else {
-          if (puter_running && puter.haveFont) {
+          if (puter_running && puter.haveFont && keydownKeys.indexOf(event.which) !== -1) {
             puter.keyPressed(event.which);
           }
         }
-        //var msg = '<br>Handler for .keydown() called: ' + event.which;
-        //$('#output').append(msg);
-        //$('#output').append(event);
+      });
+
+      $('body').keypress(function(event) {
+        if (puter_running && puter.haveFont && keydownKeys.indexOf(event.which) === -1) {
+          // Remap \r to \n
+          var key = event.which == kEnter ? 10 : event.which;
+          puter.keyPressed(key);
+        }
       });
 
 
