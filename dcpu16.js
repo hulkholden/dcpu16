@@ -1146,7 +1146,7 @@ extractFontData : function($font) {
 
             for (var y = 0; y < 8; ++y)
             {
-                var bit = 0x80 >> y;
+                var bit = 0x01 << y;
 
                 var idx = row_idx;
                 for (var x = 0; x < 4; ++x)
@@ -1242,7 +1242,7 @@ refreshDisplay : function(puter) {
             screen_ctx.fillRect(display_x, display_y, 4*scale, 8*scale);
 
             for (var y = 0; y < 8; ++y) {
-                var bit = 0x80 >> y;
+                var bit = 0x01 << y;
 
                 for (var x = 0; x < 4; ++x) {
 
