@@ -51,11 +51,11 @@
 
           <div class="tabbable">
             <ul class="nav nav-tabs">
-              <li class="active"><a href="#1" data-toggle="tab">Source</a></li>
-              <li><a href="#2" data-toggle="tab">Debug</a></li>
+              <li class="active"><a href="#source_tab" data-toggle="tab">Source</a></li>
+              <li><a href="#debug_tab" data-toggle="tab">Debug</a></li>
             </ul>
             <div class="tab-content">
-              <div class="tab-pane active" id="1">
+              <div class="tab-pane active" id="source_tab">
 
                 <form action='javascript:false'>
                   <fieldset>
@@ -98,7 +98,7 @@
                   </fieldset>
                 </form>
               </div>
-              <div class="tab-pane" id="2">
+              <div class="tab-pane" id="debug_tab">
                 <div id="registers"></div>
                 <div id="disasm"></div>
               </div>
@@ -130,6 +130,26 @@
     var puter_running = 0;
 
     $(document).ready(function(){
+
+      // shim layer with setTimeout fallback
+      window.requestAnimFrame = (function(){
+        return  window.requestAnimationFrame       || 
+                window.webkitRequestAnimationFrame || 
+                window.mozRequestAnimationFrame    || 
+                window.oRequestAnimationFrame      || 
+                window.msRequestAnimationFrame     || 
+                function( callback ){
+                  window.setTimeout(callback, 1000 / 60);
+                };
+      })();
+   
+      (function animloop(){
+        requestAnimFrame(animloop);
+        //render();
+        if (puter_running && puter.haveFont)
+          dcpu.refreshDisplay(puter);
+      })();
+
       // Load state from localStorage
       var prev_code = localStorage.getItem('code');
       if (prev_code) {
@@ -196,7 +216,7 @@
         puter.loadFont(dcpu.fontData);
       }
 
-      refreshDisplay();
+      refreshDisplay(true);
     }
 
     function load() {
@@ -230,26 +250,59 @@
     function step() {
       if (!puter_running && puter.haveFont) {
         puter.run(1);
-        refreshDisplay();
+        refreshDisplay(true);
       }
     }
 
+
+    var lastWallTime = 0;
+    var kCPUFrequency = 100000;  // Frequency in Hz
+
+    function isDebugTabActive() {
+      return $('#debug_tab').hasClass('active');
+    }
+
     function toggleRun() {
+      lastWallTime = new Date().getTime();
       puter_running = !puter_running;
       $('#runbutton').html(puter_running ? '<i class="icon-pause"></i> Pause' : '<i class="icon-play"></i> Run');
     }
 
     function updateLoop() {
+      var desired_delay = 100;   // Update slowly when stopped, throttled when running
       if (puter_running && puter.haveFont) {
-        puter.run(1000);
-        refreshDisplay();
+
+        // Execute more ops when the debug tab is actice - it's expensive to update
+        var ops_to_execute = isDebugTabActive() ? 10000 : 1000;
+
+        var last_cpu_clock = puter.getClock();
+        puter.run(ops_to_execute);
+
+        // Figure out how much cpu time we emulated, vs wall time taken, in milliseconds
+        // We use this to throttle the rate of the emulated process to ensure it runs no faster than the target frequency
+        var cur_wall_time = new Date().getTime();
+        var cur_cpu_clock = puter.getClock();
+
+        var elapsed_cpu_time  = (cur_cpu_clock - last_cpu_clock) / (kCPUFrequency / 1000);
+        var elapsed_wall_time =  cur_wall_time - lastWallTime;
+
+        desired_delay = Math.max(0, elapsed_cpu_time - elapsed_wall_time);
+        lastWallTime = cur_wall_time;
+        //$('#output').html('cpu :' + (cur_cpu_clock - last_cpu_clock) + ', wall: ' + elapsed_wall_time + ', desired: ' + desired_delay + '<br>');
+
+        refreshDisplay(false);
       }
-      setTimeout("updateLoop()", 16);
+      setTimeout(updateLoop, desired_delay);
     }
 
-    function refreshDisplay() {
-      dcpu.displayDisassembly(puter.code, puter.PC);
-      dcpu.displayState(puter);
+    function refreshDisplay(refresh_screen) {
+      if (isDebugTabActive()) {
+        dcpu.displayDisassembly(puter.code, puter.PC);
+        dcpu.displayState(puter);
+      }
+      if (refresh_screen) {
+        dcpu.refreshDisplay(puter);
+      }
     }
 
     </script>

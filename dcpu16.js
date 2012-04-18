@@ -7,6 +7,26 @@ var kOpNames = [
     'SHR', 'AND', 'BOR', 'XOR', 'IFE', 'IFN', 'IFG', 'IFB',
 ];
 
+// http://0x10cwiki.com/wiki/Video_RAM
+var kColours = [
+    '#000000',  // 0
+    '#0000aa',  // 1
+    '#00aa00',  // 2
+    '#00aaaa',  // 3
+    '#aa0000',  // 4
+    '#aa00aa',  // 5
+    '#aa5500',  // 6
+    '#aaaaaa',  // 7
+    '#555555',  // 8
+    '#5555ff',  // 9
+    '#55ff55',  // a
+    '#55ffff',  // b
+    '#ff55ff',  // c
+    '#ff55ff',  // d
+    '#ffff55',  // e
+    '#ffffff',  // f
+];
+
 
 var kBasicOpCodeCosts = [ 0, 1, 2, 2, 2, 3, 3, 2, 2, 1, 1, 1, 2, 2, 2, 2, ];
 var kNonBasicOpCodeCosts = [ 0, 2, ];
@@ -800,6 +820,7 @@ makePuter : function() {
         CondExec : 1,
         keyIndex : 0,                           // 4 bits. Indexes 0x9000.
 
+        cycle    : 0,                           // current clock
         haveFont : false,                       // set when font is updloaded
 
 
@@ -833,12 +854,17 @@ makePuter : function() {
             this.CondExec = 1;
             this.keyIndex = 0;
 
+            this.cycle    = 0;
             this.haveFont = false;
 
             // Set to an invalid value, so that we force a redraw
             for (var i = 0; i < kNumScreenChars; ++i)
                 this.lastScreen[i] = -1;
             this.lastBorder = -1;
+        },
+
+        getClock : function() {
+            return this.cycle;
         },
 
         loadFont : function(font) {
@@ -872,18 +898,18 @@ makePuter : function() {
             } else if (operand < 0x18) {
                 var next_word = this.data[this.PC++];
                 var r = this.regs[operand - 0x10];
+                this.cycle++;
                 return this.data[next_word + r];
             } else if (operand < 0x20) {
-                switch(operand)
-                {
+                switch(operand) {
                     case 0x18: return this.data[  this.SP++];
                     case 0x19: return this.data[  this.SP  ];
                     case 0x1a: return this.data[--this.SP  ];
                     case 0x1b: return this.SP;
                     case 0x1c: return this.PC;
                     case 0x1d: return this.O;
-                    case 0x1e: return this.data[this.data[this.PC++]];
-                    case 0x1f: return this.data[this.PC++];
+                    case 0x1e: this.cycle++; return this.data[this.data[this.PC++]];
+                    case 0x1f: this.cycle++; return this.data[this.PC++];
                 }
             } else if (operand < 0x40) {
                 return operand - 0x20;
@@ -906,8 +932,7 @@ makePuter : function() {
                 this.data[next_word + r] = value;
                 return;
             } else if (operand < 0x20) {
-                switch(operand)
-                {
+                switch(operand) {
                     case 0x18: this.data[ orig_sp   ] = value; return;
                     case 0x19: this.data[ orig_sp   ] = value; return;
                     case 0x1a: this.data[ orig_sp-1 ] = value; return;
@@ -952,6 +977,8 @@ makePuter : function() {
                             default:
                                 throw 'reserved';
                         }
+
+                        this.cycle += kNonBasicOpCodeCosts[a];
 
                     } else {
                         var a_next_word = this.PC;  // keep track of this, for writeback
@@ -1008,6 +1035,12 @@ makePuter : function() {
                             this.O = o;
                             this.storeResult(a, rval, a_next_word, orig_sp);
                         }
+
+                        // When the IFE/IFN test fails, there's a one-cycle cost
+                        if (!this.CondExec)
+                            this.cycle++;
+
+                        this.cycle += kBasicOpCodeCosts[op];
                     }
 
                 } else {
@@ -1152,27 +1185,9 @@ displayState : function(puter) {
     }
 
     $('#registers').html($table);
+},
 
-    // http://0x10cwiki.com/wiki/Video_RAM
-    var colours = [
-        '#000000',  // 0
-        '#0000aa',  // 1
-        '#00aa00',  // 2
-        '#00aaaa',  // 3
-        '#aa0000',  // 4
-        '#aa00aa',  // 5
-        '#aa5500',  // 6
-        '#aaaaaa',  // 7
-        '#555555',  // 8
-        '#5555ff',  // 9
-        '#55ff55',  // a
-        '#55ffff',  // b
-        '#ff55ff',  // c
-        '#ff55ff',  // d
-        '#ffff55',  // e
-        '#ffffff',  // f
-    ];
-
+refreshDisplay : function(puter) {
 
     var canvas = document.getElementById('display');
     if (canvas.getContext) {
@@ -1188,7 +1203,7 @@ displayState : function(puter) {
             var w = (128*scale) + border_size*2;
             var h = ( 96*scale) + border_size*2;
 
-            screen_ctx.fillStyle = colours[border_col];
+            screen_ctx.fillStyle = kColours[border_col];
             screen_ctx.fillRect(0,             0,             border_size, h);
             screen_ctx.fillRect(0,             0,             w,           border_size);
             screen_ctx.fillRect(w-border_size, 0,             border_size, h);
@@ -1224,7 +1239,7 @@ displayState : function(puter) {
             var display_x = (column*4) * scale + border_size;
             var display_y = (row*8)    * scale + border_size;
 
-            screen_ctx.fillStyle = colours[bg];
+            screen_ctx.fillStyle = kColours[bg];
             screen_ctx.fillRect(display_x, display_y, 4*scale, 8*scale);
 
             for (var y = 0; y < 8; ++y) {
@@ -1233,7 +1248,7 @@ displayState : function(puter) {
                 for (var x = 0; x < 4; ++x) {
 
                     if (cols[x]&bit) {
-                        screen_ctx.fillStyle = colours[fg];
+                        screen_ctx.fillStyle = kColours[fg];
                         screen_ctx.fillRect(display_x + x*scale, display_y + y*scale, scale, scale);
                     }
                 }
