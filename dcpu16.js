@@ -1218,7 +1218,6 @@ refreshDisplay : function(puter) {
 
             // Skip render if this character hasn't changed
             if (ch == puter.lastScreen[chidx]) {
-                ++chidx;
                 continue;
             }
             puter.lastScreen[chidx] = ch;
