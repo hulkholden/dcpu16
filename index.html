@@ -201,8 +201,15 @@
       updateLoop();
     });
 
+    var lastSource;
     function liveUpdate() {
       var source = $('#codearea').val();
+
+      // Avoid live updating when scrolling
+      if (source == lastSource)
+        return;
+      lastSource = source;
+
       localStorage.setItem('code', source);
 
       $('#output').html('');
