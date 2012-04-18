@@ -1,6 +1,7 @@
 var http = require('http');
-var fs = require('fs');
+var fs   = require('fs');
 var path = require('path');
+var tty  = require("tty");
 
 http.createServer(function (request, response) {
   console.log(request.url);
@@ -10,6 +11,15 @@ http.createServer(function (request, response) {
 }).listen(8124);
 
 console.log('Server running at http://127.0.0.1:8124/');
+
+process.openStdin().on("keypress", function(chunk, key) {
+  if(key && key.name === "c" && key.ctrl) {
+    console.log("Got ctrl-c - exiting");
+    process.exit();
+  }
+});
+
+tty.setRawMode(true);
 
 function serveFile(request, response) {
 
