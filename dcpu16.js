@@ -177,23 +177,30 @@ makeDisassembler : function(_code) {
             var a  = (opcode&0x03f0)>>4;
             var b  = (opcode&0xfc00)>>10;
 
-            var result = {text:'???', cost:0};
+            var result = {text:'???', cost:''};
 
             if (op == 0) {
 
-                if (a < kNonBasicOpCodeCosts.length) 
-                    result.cost += kNonBasicOpCodeCosts[a];
+                result.cost += kNonBasicOpCodeCosts[a] || 0;
 
                 if (a == 0x1) {
-                    var bdat = this.PC; if (operandHasData(b)) { ++this.PC; ++result.cost; }
+                    var bdat = this.PC; if (operandHasData(b)) { ++this.PC; result.cost += '+1'; }
                     result.text = 'JSR ' + this.operandName(b, bdat);
                 }
             } else if (op < kOpNames.length) {
 
                 result.cost += kBasicOpCodeCosts[op];
 
-                var adat = this.PC; if (operandHasData(a)) { ++this.PC; ++result.cost; }
-                var bdat = this.PC; if (operandHasData(b)) { ++this.PC; ++result.cost; }
+                var cost = 0;
+
+                var adat = this.PC; if (operandHasData(a)) { ++this.PC; ++cost; }
+                var bdat = this.PC; if (operandHasData(b)) { ++this.PC; ++cost; }
+
+                result.cost += '+' + cost;
+
+                // IFx insturction have a potential 1-cycle cost (for skipped instruction)
+                if (op >= 0xc)
+                    result.cost += "(+1)";
 
                 result.text = kOpNames[op] + ' ' + this.operandName(a, adat) + ', ' + this.operandName(b, bdat);
             }
@@ -812,7 +819,7 @@ makePuter : function() {
     var puter = {
         code     : null,
         data     : new Uint16Array(0x10000),
-        hitCount : new Uint16Array(0x10000),    // total times this op has been executed
+        hitCount : new Uint32Array(0x10000),    // total times this op has been executed
         regs     : new Uint16Array(8),          // A B C X Y Z I J
         PC       : 0,
         SP       : 0,
@@ -822,8 +829,6 @@ makePuter : function() {
 
         cycle    : 0,                           // current clock
         haveFont : false,                       // set when font is updloaded
-
-
 
         // lastScreen keeps track of the last character we rendered, to allow faster screen updates
         lastScreen : new Uint16Array(kNumScreenChars),
@@ -953,9 +958,9 @@ makePuter : function() {
         run : function(cycle_count) {
 
             for( var count = 0; count < cycle_count; ++count ) {
-                var orig_sp = this.SP;
-
-                this.hitCount[this.PC]++;   // NB: to handle self-modifying code we should add cycle cost here. We just do a mulitply when displaying though.
+                var orig_pc     = this.PC;
+                var orig_sp     = this.SP;
+                var orig_cycles = this.cycle;
 
                 var opcode = this.data[this.PC++];
                 var op = (opcode&0x000f);
@@ -1048,6 +1053,8 @@ makePuter : function() {
                     this.CondExec = 1;
                     this.PC += opLength(op, a, b)-1; // -1 as PC has already been incremented
                 }
+
+                this.hitCount[orig_pc] += (this.cycle - orig_cycles);
             }
         },
     };
@@ -1071,14 +1078,14 @@ displayDisassembly : function(code, cur_pc) {
             e.pc        = dis.PC;
             e.disasm    = dis.disasm();
             e.epc       = dis.PC;
-            e.totalCost = puter.hitCount[e.pc] * e.disasm.cost;
+            e.totalCost = puter.hitCount[e.pc];
 
             max_total_cost = Math.max(max_total_cost, e.totalCost);
 
             disassembly.push(e);
         }
 
-        var profile = '<th>Cost</th><th width=60>Hits</th>';
+        var profile = '<th>Cost</th><th width=60>Cycles</th>';
         $pre.append('<tr><th width=40>PC</th>' + profile + '<th class="op">Ops</th><th class="op">Bytes</th></tr>');
 
         for (var e = 0; e < disassembly.length; ++e) {
