@@ -25,7 +25,6 @@
             <li>macros (they should be parsed ok, but you can't invoke them)</li>
             <li>push(i), pop(i) pseudo-ops (or macros?)</li>
             <li>Some code does 'IFE a, b FOO a,b' all on one line, where 'FOO' is the conditially executed instruction. I don't support this yet.
-            <li>I don't handle keyboard input yet (lame, I know!)</li>
             <li>I think there's some emulation bugs to do with the display+font</li>
           </ul>
           </div>
@@ -142,6 +141,32 @@
         liveUpdate();
       });
 
+      var kEnter = 13;
+      var kLeft  = 37;
+      var kUp    = 38;
+      var kRight = 39;
+      var kDown  = 40;
+      var kF10   = 121;
+      var kF8    = 119;
+
+      $('body').keydown(function(event) {
+        if (event.which === kEnter) {
+          event.preventDefault();
+        } else if (event.which === kF10) {
+          step();
+        } else if (event.which === kF8) {
+          toggleRun();
+        } else {
+          if (puter_running && puter.haveFont) {
+            puter.keyPressed(event.which);
+          }
+        }
+        //var msg = '<br>Handler for .keydown() called: ' + event.which;
+        //$('#output').append(msg);
+        //$('#output').append(event);
+      });
+
+
       var $font = $('<img />');
       $font.attr('src', 'font.png').load(function() {
         dcpu.extractFontData($font);
@@ -216,7 +241,7 @@
 
     function updateLoop() {
       if (puter_running && puter.haveFont) {
-        puter.run(5000);
+        puter.run(1000);
         refreshDisplay();
       }
       setTimeout("updateLoop()", 16);
@@ -224,7 +249,7 @@
 
     function refreshDisplay() {
       dcpu.displayDisassembly(puter.code, puter.PC);
-      dcpu.displayState(puter);      
+      dcpu.displayState(puter);
     }
 
     </script>

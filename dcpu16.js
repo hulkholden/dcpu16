@@ -798,8 +798,11 @@ makePuter : function() {
         SP       : 0,
         O        : 0,
         CondExec : 1,
+        keyIndex : 0,                           // 4 bits. Indexes 0x9000.
 
         haveFont : false,                       // set when font is updloaded
+
+
 
         // lastScreen keeps track of the last character we rendered, to allow faster screen updates
         lastScreen : new Uint16Array(kNumScreenChars),
@@ -828,6 +831,7 @@ makePuter : function() {
             this.SP       = 0;
             this.O        = 0;
             this.CondExec = 1;
+            this.keyIndex = 0;
 
             this.haveFont = false;
 
@@ -842,6 +846,16 @@ makePuter : function() {
                 this.data[0x8180 + i] = font[i];
             }
             this.haveFont = true;
+        },
+
+        keyPressed : function(key) {
+            var address = 0x9000 + this.keyIndex;
+            if (!this.data[address]) {
+                //printIt("Setting " + this.keyIndex + " to " + key);
+                this.data[address] = key;
+                this.data[0x9010] = address;
+                this.keyIndex = (this.keyIndex + 1) & 0xf;
+            }
         },
 
         jsr : function(addr) {
