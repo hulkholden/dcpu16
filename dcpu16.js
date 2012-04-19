@@ -1,10 +1,9 @@
-
 function DCPU16() {
 
 var kRegNames = [ 'A', 'B', 'C', 'X', 'Y', 'Z', 'I', 'J'];
 var kOpNames = [
     'xxx', 'SET', 'ADD', 'SUB', 'MUL', 'DIV', 'MOD', 'SHL',
-    'SHR', 'AND', 'BOR', 'XOR', 'IFE', 'IFN', 'IFG', 'IFB',
+    'SHR', 'AND', 'BOR', 'XOR', 'IFE', 'IFN', 'IFG', 'IFB'
 ];
 
 // http://0x10cwiki.com/wiki/Video_RAM
@@ -24,12 +23,12 @@ var kColours = [
     '#ff5555',  // c
     '#ff55ff',  // d
     '#ffff55',  // e
-    '#ffffff',  // f
+    '#ffffff'   // f
 ];
 
 
-var kBasicOpCodeCosts = [ 0, 1, 2, 2, 2, 3, 3, 2, 2, 1, 1, 1, 2, 2, 2, 2, ];
-var kNonBasicOpCodeCosts = [ 0, 2, ];
+var kBasicOpCodeCosts = [ 0, 1, 2, 2, 2, 3, 3, 2, 2, 1, 1, 1, 2, 2, 2, 2 ];
+var kNonBasicOpCodeCosts = [ 0, 2 ];
 
 var kNumScreenChars = 32*12;
 
@@ -127,7 +126,7 @@ function lerp(r1,g1,b1, r2,g2,b2, a) {
     return {
         r: r1 + a * (r2-r1),
         g: g1 + a * (g2-g1),
-        b: b1 + a * (b2-b1),
+        b: b1 + a * (b2-b1)
     };
 }
 
@@ -532,11 +531,11 @@ makeAssembler : function() {
                     var matched_closing_quote = 0;
                     while(i < end) {
                         var char_code = line.charCodeAt(i);
-                        var char      = line.charAt(i);
+                        var character = line.charAt(i);
                         if (in_escape) {
-                            var unescaped = getUnescapedChar( char );
+                            var unescaped = getUnescapedChar( character );
                             if (unescaped < 0) {
-                                throw {name:'ParseError', message:"Unknown escape sequence: '" + char + "'", sourceLoc:{line:operand.sourceLoc.line, col:i, colStart:i, colEnd:i}};
+                                throw {name:'ParseError', message:"Unknown escape sequence: '" + character + "'", sourceLoc:{line:operand.sourceLoc.line, col:i, colStart:i, colEnd:i}};
                             }
                             str = str + unescaped;
                             in_escape = 0;
@@ -547,7 +546,7 @@ makeAssembler : function() {
                         } else if (char_code == kBackslash) {
                             in_escape = 1;
                         } else {
-                            str = str + char;
+                            str = str + character;
                         }
                         ++i;
                     }
@@ -588,7 +587,7 @@ makeAssembler : function() {
             skipWhite : function() {
                 while(i < end && isWhitespace(line.charCodeAt(i)))
                     ++i;
-            },
+            }
         };
 
         return lexer;
@@ -807,7 +806,7 @@ makeAssembler : function() {
             for (var i = 0; i < buf.length; ++i)
                 this.code[i] = buf[i];
 
-        },
+        }
     };
 
     return assembler;
@@ -1060,7 +1059,7 @@ makePuter : function() {
 
                 this.hitCount[orig_pc] += (this.cycle - orig_cycles);
             }
-        },
+        }
     };
 
     return puter;
@@ -1312,7 +1311,7 @@ parseBinary : function(text) {
     buf[i] = data[i];
 
   return buf;
-},
+}
 
 };
 
