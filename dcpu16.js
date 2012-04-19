@@ -926,6 +926,8 @@ makePuter : function() {
         },
 
         storeResult : function(operand, value, next_word_addr, orig_sp) {
+            value &= 0xffff;
+
             if (operand >= 0x0 && operand < 0x8) {
                 this.regs[operand] = value;
                 return;
@@ -1010,10 +1012,10 @@ makePuter : function() {
                                 break;
                             case 0x4:
                                 rval = aval * bval;
-                                o = ((aval*bval)>>16)&0xffff;
+                                o = (rval>>16)&0xffff;
                                 break;
                             case 0x5:
-                                rval = bval ? aval/bval : 0;
+                                rval = bval ? Math.floor(aval/bval) : 0;
                                 o = bval ? ((aval<<16)/bval)&0xffff : 0;
                                 break;
                             case 0x6:
@@ -1021,19 +1023,19 @@ makePuter : function() {
                                 break;
                             case 0x7:
                                 rval = aval << bval;
-                                o = ((aval<<bval)>>16)&0xffff;
+                                o = (rval>>16)&0xffff;
                                 break;
                             case 0x8:
                                 rval = aval >> bval;
-                                o = ((aval<<16)>>b)&0xffff;
+                                o = ((aval<<16)>>bval)&0xffff;
                                 break;
-                            case 0x9: rval = aval & bval;               break;
-                            case 0xa: rval = aval | bval;               break;
-                            case 0xb: rval = aval ^ bval;               break;
-                            case 0xc: this.CondExec = aval == bval;     break;
-                            case 0xd: this.CondExec = aval != bval;     break;
-                            case 0xe: this.CondExec = aval > bval;      break;
-                            case 0xf: this.CondExec = (aval&bval) != 0; break;
+                            case 0x9: rval = aval & bval;                break;
+                            case 0xa: rval = aval | bval;                break;
+                            case 0xb: rval = aval ^ bval;                break;
+                            case 0xc: this.CondExec = aval === bval;     break;
+                            case 0xd: this.CondExec = aval !== bval;     break;
+                            case 0xe: this.CondExec = aval > bval;       break;
+                            case 0xf: this.CondExec = (aval&bval) !== 0; break;
                             default:
                                 throw 'fail - crazy opcode';
                         }
