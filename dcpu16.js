@@ -21,7 +21,7 @@ var kColours = [
     '#5555ff',  // 9
     '#55ff55',  // a
     '#55ffff',  // b
-    '#ff55ff',  // c
+    '#ff5555',  // c
     '#ff55ff',  // d
     '#ffff55',  // e
     '#ffffff',  // f
