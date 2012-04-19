@@ -831,8 +831,9 @@ makePuter : function() {
         haveFont : false,                       // set when font is updloaded
 
         // lastScreen keeps track of the last character we rendered, to allow faster screen updates
-        lastScreen : new Uint16Array(kNumScreenChars),
-        lastBorder : -1,
+        lastScreen : new Uint16Array(kNumScreenChars),      // last color/character for this cell
+        lastGlyph  : new Uint32Array(kNumScreenChars),      // last glyph data for this cell
+        lastBorder : 0xffff,
 
         loadCode :  function(code) {
             this.code = code;   // Keep track of the original code. 
@@ -863,9 +864,11 @@ makePuter : function() {
             this.haveFont = false;
 
             // Set to an invalid value, so that we force a redraw
-            for (var i = 0; i < kNumScreenChars; ++i)
-                this.lastScreen[i] = -1;
-            this.lastBorder = -1;
+            for (var i = 0; i < kNumScreenChars; ++i) {
+                this.lastScreen[i] = 0xffff;
+                this.lastGlyph[i]  = 0xcdcdcdcd;    // hopefully unused :)
+            }
+            this.lastBorder = 0xffff;
         },
 
         getClock : function() {
@@ -1228,19 +1231,23 @@ refreshDisplay : function(puter) {
 
             var ch = puter.data[0x8000 + chidx];
 
-            // Skip render if this character hasn't changed
-            if (ch == puter.lastScreen[chidx]) {
-                continue;
-            }
-            puter.lastScreen[chidx] = ch;
-
-            var fg    = (ch>>12)&0xf;
-            var bg    = (ch>> 8)&0xf;
-            var blink = (ch>> 7)&0x1;
             var glyph = (ch    )&0x7f;
 
             var glyph_ab = puter.data[0x8180 + glyph*2 + 0];
             var glyph_cd = puter.data[0x8180 + glyph*2 + 1];
+
+            var glyph_data = (glyph_ab<<16)|glyph_cd;
+
+            // Skip render if this character hasn't changed
+            if (ch == puter.lastScreen[chidx] && glyph_data == puter.lastGlyph[chidx]) {
+                continue;
+            }
+            puter.lastScreen[chidx] = ch;
+            puter.lastGlyph[chidx]  = glyph_data;
+
+            var fg    = (ch>>12)&0xf;
+            var bg    = (ch>> 8)&0xf;
+            var blink = (ch>> 7)&0x1;
 
             var cols = [ (glyph_ab>>8)&0xff,
                          (glyph_ab   )&0xff,
