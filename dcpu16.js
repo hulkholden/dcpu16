@@ -150,9 +150,8 @@ makeDisassembler : function(_code) {
             } else if (operand < 0x10) {
                 return '[' + kRegNames[operand - 0x8] + ']';
             } else if (operand < 0x18) {
-                var next_word = this.code[operand_data];
+                var next_word = this.code[operand_data] || 0;
                 return '[0x' + next_word.toString(16) + ' + ' + kRegNames[operand - 0x10] + ']';
-
             } else if (operand < 0x20) {
                 switch(operand)
                 {
@@ -1109,7 +1108,8 @@ displayDisassembly : function(code, cur_pc) {
 
             var ops = '';
             for (var i = pc; i < epc; ++i) {
-                var op = dis.code[i].toString(16);
+                var op = dis.code[i] || 0;
+                op = op.toString(16);
                 while(op.length < 4) op = '0' + op;
                 ops +=  op + ' ';
             }
