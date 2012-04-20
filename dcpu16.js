@@ -427,6 +427,16 @@ makeAssembler : function() {
                 return 0x20 + val;
             }
         } else if (operand.is_string_literal) {
+            // Treat one character numeric string literals as character constants
+            if (operand.value.length == 1) {
+                var val = operand.value.charCodeAt(0);
+                if (val >= 0x20) {
+                    operand.data = val; // next_word
+                    return 0x1f;
+                } else {
+                    return 0x20 + val;
+                }
+            }
             throw {name:'ParseError', message:"Unexpected string literal", sourceLoc:operand.sourceLoc};
         }
 
@@ -794,8 +804,13 @@ makeAssembler : function() {
                 if ((typeof buf[i]) === 'string') {
                     var label = buf[i];
                     if (this.labels.hasOwnProperty(label)) {
-                            var instruction_idx = this.labels[label];
-                        buf[i] = this.instructions[instruction_idx].address;
+                        var instruction_idx = this.labels[label];
+
+                        var address = buf.length;
+                        if (instruction_idx < this.instructions.length)
+                            address = this.instructions[instruction_idx].address;
+                        buf[i] = address;
+
                     } else {
                         throw {name:'ParseError', message:"Undefined label '" + label + '"'};
                     }
